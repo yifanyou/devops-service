@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="io.choerodon.devops.infra.mapper.ApplicationMapper">
+    <select id="list" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.id,
+        da.project_id,
+        da.name,
+        da.code,
+        da.is_active,
+        da.is_synchro,
+        da.gitlab_project_id,
+        da.app_template_id,
+        da.uuid
+        FROM devops_application da
+        where da.project_id = #{projectId}
+        <if test="isActive != null">
+            <if test="isActive">
+                AND da.is_active = TRUE
+            </if>
+            <if test="!isActive">
+                AND da.is_active = FALSE
+            </if>
+        </if>
+        <if test="hasVersion != null">
+            <if test="hasVersion">
+                AND EXISTS ( SELECT 1 FROM devops_app_version dav WHERE dav.app_id = da.id )
+            </if>
+            <if test="!hasVersion">
+                AND NOT EXISTS ( SELECT 1 FROM devops_app_version dav WHERE dav.app_id = da.id )
+            </if>
+        </if>
+        <include refid="sqlparam"/>
+        <if test="index !=''">
+            ORDER BY da.is_active desc,
+            (
+            da.is_synchro = 1
+            AND da.gitlab_project_id IS NOT NULL
+            )
+            OR da.is_synchro = 0 DESC,
+            da.id desc
+        </if>
+    </select>
+
+    <select id="listByEnvId" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT DISTINCT
+        da.id,
+        da.`code`,
+        da.`name` ,
+        dam.publish_level,
+        da.project_id projectId,
+        dam.contributor contributor,
+        dam.description description
+        FROM
+        devops_application da
+        JOIN devops_app_instance dai ON dai.app_id = da.id
+        JOIN devops_env de ON de.id = dai.env_id
+        left join devops_app_market dam on dam.app_id = da.id
+        WHERE
+        de.project_id = #{projectId}
+        AND de.id = #{envId}
+        <choose>
+            <when test="status == 'running'">
+                AND dai.`status` = 'running'
+            </when>
+            <when test="status == 'nodeleted'">
+                AND dai.`status` != 'deleted'
+            </when>
+        </choose>
+    </select>
+
+    <select id="listActive" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.*
+        FROM
+        devops_application da
+        WHERE
+        da.is_active
+        AND da.gitlab_project_id is not null
+        AND da.project_id = #{projectId}
+    </select>
+
+    <select id="listAll" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT DISTINCT
+        dam.publish_level publishLevel,
+        dam.contributor,
+        dam.description,
+        da.*
+        FROM
+        devops_application da
+        JOIN devops_app_instance dai ON dai.app_id = da.id
+        AND dai.`status` != 'deleted'
+        JOIN devops_env de ON dai.env_id = de.id
+        LEFT JOIN devops_app_market dam ON dam.app_id = da.id
+        WHERE
+        da.is_active
+        AND de.project_id = #{projectId}
+        ORDER BY
+        dam.publish_level ASC,
+        da.id DESC
+    </select>
+
+    <sql id="sqlparam">
+        <if test='searchParam != null'>
+            <if test='searchParam.code != null and searchParam.code.size > 0'>
+                AND
+                <foreach collection="searchParam.code" item="code" open="(" separator=" OR " close=")">
+                    da.code LIKE CONCAT(CONCAT('%', #{code, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.name != null and searchParam.name.size > 0'>
+                AND
+                <foreach collection="searchParam.name" item="name" open="(" separator=" OR " close=")">
+                    da.name LIKE CONCAT(CONCAT('%', #{name, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.active != null and searchParam.active.size > 0'>
+                AND
+                <foreach collection="searchParam.active" item="active" open="(" separator=" OR " close=")">
+                    <if test='active!=-1'>
+                        da.is_active = #{active,jdbcType=TINYINT}
+                        <if test='active==1'>
+                            and da.is_synchro = 1
+                        </if>
+                    </if>
+                    <if test='active==-1'>
+                        da.is_synchro = 0
+                    </if>
+                </foreach>
+            </if>
+        </if>
+        <if test='param != null and param != ""'>
+            AND (da.code LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR da.name LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            )
+        </if>
+    </sql>
+
+    <select id="listByActiveAndPubAndVersion" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.`id`,
+        da.`code`,
+        da.`name`
+        FROM
+        devops_application da
+        WHERE
+        da.project_id = #{projectId}
+        AND da.is_active = #{active}
+        AND ((select count(1) from devops_app_market dam where da.id=dam.app_id)=0)
+        AND ((select count(1) from devops_app_version dav where da.id=dav.app_id)>0)
+        <include refid="sqlparam"/>
+    </select>
+
+    <select id="queryByToken" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.id,
+        da.project_id,
+        da.name,
+        da.code,
+        da.is_active,
+        da.is_synchro,
+        da.gitlab_project_id,
+        da.app_template_id,
+        da.uuid,
+        da.token,
+        da.object_version_number
+        FROM
+        devops_application da
+        WHERE
+        da.token = #{token}
+    </select>
+
+    <select id="checkAppCanDisable" resultType="java.lang.Integer">
+        SELECT
+        count( 1 )
+        FROM
+        devops_application da
+        WHERE
+        NOT EXISTS ( SELECT 1 FROM devops_app_market dam WHERE dam.app_id = da.id )
+        AND NOT EXISTS ( SELECT 1 FROM devops_app_instance dai JOIN devops_app_version dav ON dav.id =
+        dai.app_version_id WHERE dai.`status` != "deleted" AND dav.app_id = da.id )
+        AND da.id = #{applicationId};
+    </select>
+
+    <select id="listByCode" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.`id`,
+        da.project_id
+        FROM
+        devops_application da
+        join devops_app_market dam
+        on da.id = dam.app_id
+        WHERE
+        da.code = #{code}
+    </select>
+
+    <select id="listCodeRepository" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.id,
+        da.project_id,
+        da.name,
+        da.code,
+        da.is_active,
+        da.is_synchro,
+        da.gitlab_project_id,
+        da.app_template_id,
+        da.uuid
+        FROM devops_application da
+        where da.project_id = #{projectId}
+        AND da.is_active = 1
+        AND da.gitlab_project_id IS NOT NULL
+        <include refid="sqlparam"/>
+    </select>
+</mapper>

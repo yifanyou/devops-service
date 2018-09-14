@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="io.choerodon.devops.infra.mapper.DevopsIngressMapper">
+
+    <select id="queryIngressNameByServiceId" resultType="java.lang.String">
+        SELECT
+        di. NAME
+        FROM
+        devops_ingress di,
+        (
+        SELECT
+        *
+        FROM
+        devops_ingress_path dip
+        WHERE
+        service_id = #{serviceId}
+        ) r
+        WHERE
+        di.id = r.ingress_id
+        GROUP BY
+        di. NAME
+    </select>
+
+    <select id="selectIngress" resultType="io.choerodon.devops.infra.dataobject.DevopsIngressDO">
+        SELECT DISTINCT
+        di.id id,
+        di.project_id projectId,
+        di.env_id envId,
+        di.`name` name,
+        di.`domain` domain,
+        di.status,
+        di.is_usable isUsable,
+        de.`name` envName,
+        de.`code` namespace
+        FROM
+        devops_ingress di
+        JOIN devops_ingress_path dip ON dip.ingress_id = di.id
+        JOIN devops_env de on de.id = di.env_id
+        LEFT JOIN devops_service ds on ds.id = dip.service_id
+        WHERE di.project_id = #{projectId}
+        <if test="envId != null">
+            AND de.id = #{envId}
+        </if>
+        <if test='searchParam != null'>
+            <if test='searchParam.domain != null and searchParam.domain.size > 0'>
+                AND
+                <foreach collection="searchParam.domain" item="domain" open="(" separator=" OR " close=")">
+                    di.domain LIKE CONCAT(CONCAT('%', #{domain, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.name != null and searchParam.name.size > 0'>
+                AND
+                <foreach collection="searchParam.name" item="name" open="(" separator=" OR " close=")">
+                    di.name LIKE CONCAT(CONCAT('%', #{name, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.envName != null and searchParam.envName.size > 0'>
+                AND
+                <foreach collection="searchParam.envName" item="envName" open="(" separator=" OR " close=")">
+                    de.name LIKE CONCAT(CONCAT('%', #{envName, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.envCode != null and searchParam.envCode.size > 0'>
+                AND
+                <foreach collection="searchParam.envCode" item="envCode" open="(" separator=" OR " close=")">
+                    de.code LIKE CONCAT(CONCAT('%', #{envCode, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.path != null and searchParam.path.size > 0'>
+                AND
+                <foreach collection="searchParam.path" item="path" open="(" separator=" OR " close=")">
+                    dip.path LIKE CONCAT(CONCAT('%', #{path, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.serviceName != null and searchParam.serviceName.size > 0'>
+                AND
+                <foreach collection="searchParam.serviceName" item="serviceName" open="(" separator=" OR " close=")">
+                    ds.name LIKE CONCAT(CONCAT('%', #{serviceName, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.ingressId != null and searchParam.domainId.size > 0'>
+                AND
+                <foreach collection="searchParam.ingressId" item="ingressId" open="(" separator=" OR " close=")">
+                    di.id = #{ingressId}
+                </foreach>
+            </if>
+            <if test='searchParam.envId != null and searchParam.envId.size > 0'>
+                AND
+                <foreach collection="searchParam.envId" item="envId" open="(" separator=" OR " close=")">
+                    di.env_id = #{envId}
+                </foreach>
+            </if>
+            <if test='searchParam.serviceId != null and searchParam.serviceId.size > 0'>
+                AND
+                <foreach collection="searchParam.serviceId" item="serviceId" open="(" separator=" OR " close=")">
+                    ds.id = #{serviceId}
+                </foreach>
+            </if>
+        </if>
+        <if test='param != null and param != ""'>
+            AND (di.domain LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR di.name LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR de.name LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR de.code LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR dip.path LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR ds.name LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%'))
+        </if>
+    </select>
+
+    <select id="checkEnvHasIngress" resultType="java.lang.Boolean">
+        SELECT
+        COUNT( 1 ) > 0 exist
+        FROM
+        devops_ingress
+        WHERE
+        env_id = #{envId};
+    </select>
+</mapper>
