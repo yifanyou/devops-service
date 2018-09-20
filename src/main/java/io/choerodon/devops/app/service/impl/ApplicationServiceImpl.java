@@ -275,6 +275,8 @@ public class ApplicationServiceImpl implements ApplicationService {
                 File file = new File(gitUtil.getWorkingDirectory(applicationDir));
                 Map<String, String> params = new HashMap<>();
                 params.put("{{group.name}}", organization.getCode() + "-" + projectE.getCode());
+                params.put("{{org.code}}", organization.getCode());
+                params.put("{{project.code}}", projectE.getCode());
                 params.put("{{service.code}}", applicationE.getCode());
                 FileUtil.replaceReturnFile(file, params);
             } catch (Exception e) {
