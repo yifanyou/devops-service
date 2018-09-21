@@ -101,7 +101,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     public String create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO) {
         //add project prefix
         String code = devopsEnviromentDTO.getCode();
-        devopsEnviromentDTO.setCode(projectId + "#" + code);
+        devopsEnviromentDTO.setCode(projectId + "-" + code);
 
 
         DevopsEnvironmentE devopsEnvironmentE = ConvertHelper.convert(devopsEnviromentDTO, DevopsEnvironmentE.class);
