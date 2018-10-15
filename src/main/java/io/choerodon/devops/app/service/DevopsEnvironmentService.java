@@ -2,10 +2,9 @@ package io.choerodon.devops.app.service;
 
 import java.util.List;
 
-import io.choerodon.devops.api.dto.DevopsEnviromentDTO;
-import io.choerodon.devops.api.dto.DevopsEnviromentRepDTO;
-import io.choerodon.devops.api.dto.DevopsEnvironmentUpdateDTO;
-import io.choerodon.devops.api.dto.EnvSyncStatusDTO;
+import io.choerodon.asgard.saga.feign.SagaClient;
+import io.choerodon.devops.api.dto.*;
+import io.choerodon.devops.domain.application.entity.DevopsEnvironmentE;
 import io.choerodon.devops.domain.application.event.GitlabProjectPayload;
 
 /**
@@ -22,6 +21,16 @@ public interface DevopsEnvironmentService {
     String create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO);
 
     /**
+     * 项目下环境流水线查询环境
+     *
+     * @param projectId 项目id
+     * @param active    是否可用
+     * @return List
+     */
+    List<DevopsEnvGroupEnvsDTO> listDevopsEnvGroupEnvs(Long projectId, Boolean active);
+
+
+    /**
      * 项目下查询环境
      *
      * @param projectId 项目id
@@ -29,7 +38,6 @@ public interface DevopsEnvironmentService {
      * @return List
      */
     List<DevopsEnviromentRepDTO> listByProjectIdAndActive(Long projectId, Boolean active);
-
     /**
      * 项目下查询环境
      *
@@ -71,7 +79,7 @@ public interface DevopsEnvironmentService {
      * @param environmentIds 环境列表
      * @return List
      */
-    List<DevopsEnviromentRepDTO> sort(Long[] environmentIds);
+    DevopsEnvGroupEnvsDTO sort(Long[] environmentIds);
 
 
     /**
@@ -105,7 +113,7 @@ public interface DevopsEnvironmentService {
      * @param projectId 项目id
      * @return List
      */
-    List<DevopsEnviromentRepDTO> listByProjectId(Long projectId);
+    List<DevopsEnviromentRepDTO> listByProjectId(Long projectId, Long appId);
 
     /**
      * 创建环境saga事件
@@ -116,4 +124,8 @@ public interface DevopsEnvironmentService {
 
 
     EnvSyncStatusDTO queryEnvSyncStatus(Long projectId, Long envId);
+
+    String handDevopsEnvGitRepository(DevopsEnvironmentE devopsEnvironmentE);
+
+    void initMockService(SagaClient sagaClient);
 }

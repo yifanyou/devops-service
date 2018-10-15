@@ -6,6 +6,7 @@ import javax.persistence.Table;
 
 import io.choerodon.mybatis.annotation.ModifyAudit;
 import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
 
 /**
  * Created by younger on 2018/4/9.
@@ -13,7 +14,7 @@ import io.choerodon.mybatis.annotation.VersionAudit;
 @VersionAudit
 @ModifyAudit
 @Table(name = "devops_env")
-public class DevopsEnvironmentDO {
+public class DevopsEnvironmentDO extends AuditDomain {
     @Id
     @GeneratedValue
     private Long id;
@@ -29,10 +30,10 @@ public class DevopsEnvironmentDO {
     private String description;
     private Boolean isConnected;
     private Boolean isActive;
+    private Long devopsEnvGroupId;
     private Long gitCommit;
     private Long devopsSyncCommit;
     private Long agentSyncCommit;
-    private Long objectVersionNumber;
 
     public Long getId() {
         return id;
@@ -99,14 +100,6 @@ public class DevopsEnvironmentDO {
         isConnected = connect;
     }
 
-    public Long getObjectVersionNumber() {
-        return objectVersionNumber;
-    }
-
-    public void setObjectVersionNumber(Long objectVersionNumber) {
-        this.objectVersionNumber = objectVersionNumber;
-    }
-
     public Long getSequence() {
         return sequence;
     }
@@ -169,5 +162,13 @@ public class DevopsEnvironmentDO {
 
     public void setAgentSyncCommit(Long agentSyncCommit) {
         this.agentSyncCommit = agentSyncCommit;
+    }
+
+    public Long getDevopsEnvGroupId() {
+        return devopsEnvGroupId;
+    }
+
+    public void setDevopsEnvGroupId(Long devopsEnvGroupId) {
+        this.devopsEnvGroupId = devopsEnvGroupId;
     }
 }

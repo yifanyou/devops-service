@@ -16,6 +16,7 @@ public class DevopsEnvironmentE {
     private Long id;
     private ProjectE projectE;
     private Long gitlabEnvProjectId;
+    private Long devopsEnvGroupId;
     private Long hookId;
     private String envIdRsa;
     private String envIdRsaPub;
@@ -168,6 +169,11 @@ public class DevopsEnvironmentE {
         this.sequence = sequence;
     }
 
+    public DevopsEnvironmentE resetOrder(Long sequence) {
+        this.sequence = sequence;
+        return this;
+    }
+
     public void initToken(String token) {
         this.token = token;
     }
@@ -243,6 +249,15 @@ public class DevopsEnvironmentE {
 
     public void setGitCommit(Long gitCommit) {
         this.gitCommit = gitCommit;
+    }
+
+
+    public Long getDevopsEnvGroupId() {
+        return devopsEnvGroupId;
+    }
+
+    public void setDevopsEnvGroupId(Long devopsEnvGroupId) {
+        this.devopsEnvGroupId = devopsEnvGroupId;
     }
 
     /**

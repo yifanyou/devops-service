@@ -2,6 +2,7 @@ package io.choerodon.devops.app.service.impl;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,10 @@ import io.choerodon.devops.domain.application.entity.ApplicationE;
 import io.choerodon.devops.domain.application.entity.ApplicationVersionE;
 import io.choerodon.devops.domain.application.entity.ApplicationVersionValueE;
 import io.choerodon.devops.domain.application.entity.ProjectE;
-import io.choerodon.devops.domain.application.repository.*;
+import io.choerodon.devops.domain.application.repository.ApplicationRepository;
+import io.choerodon.devops.domain.application.repository.ApplicationVersionRepository;
+import io.choerodon.devops.domain.application.repository.ApplicationVersionValueRepository;
+import io.choerodon.devops.domain.application.repository.IamRepository;
 import io.choerodon.devops.domain.application.valueobject.Organization;
 import io.choerodon.devops.infra.common.util.FileUtil;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
@@ -40,19 +44,10 @@ public class ApplicationVersionServiceImpl implements ApplicationVersionService 
     private IamRepository iamRepository;
     @Autowired
     private ApplicationVersionValueRepository applicationVersionValueRepository;
-    @Autowired
-    private ApplicationInstanceRepository applicationInstanceRepository;
 
     @Value("${services.helm.url}")
     private String helmUrl;
 
-
-    @Override
-    public Page<ApplicationVersionRepDTO> listApplicationVersion(Long projectId, PageRequest pageRequest, String searchParam) {
-        Page<ApplicationVersionE> applicationVersionEPage = applicationVersionRepository.listApplicationVersion(
-                projectId, pageRequest, searchParam);
-        return ConvertPageHelper.convertPage(applicationVersionEPage, ApplicationVersionRepDTO.class);
-    }
 
     @Override
     public void create(String image, String token, String version, String commit, MultipartFile files) {
@@ -79,12 +74,22 @@ public class ApplicationVersionServiceImpl implements ApplicationVersionService 
             return;
         }
         String destFilePath = DESTPATH + version;
+        FileUtil.unTarGZ(path, destFilePath);
+        String values = null;
         try {
-            FileUtil.unTarGZ(path, destFilePath);
-            applicationVersionValueE.setValue(
-                    FileUtil.replaceReturnString(new FileInputStream(new File(FileUtil.queryFileFromFiles(
-                            new File(destFilePath), "values.yaml").getAbsolutePath())), null));
-
+            values = FileUtil.replaceReturnString(new FileInputStream(new File(FileUtil.queryFileFromFiles(
+                    new File(destFilePath), "values.yaml").getAbsolutePath())), null);
+        } catch (FileNotFoundException e) {
+            throw new CommonException(e);
+        }
+        try {
+            FileUtil.jungeYamlFormat(values);
+        } catch (CommonException e) {
+            throw new CommonException("The format of the values.yaml in the chart is invalid!", e);
+        }
+        applicationVersionValueE.setValue(
+                values);
+        try {
             applicationVersionE.initApplicationVersionValueE(applicationVersionValueRepository
                     .create(applicationVersionValueE).getId());
         } catch (Exception e) {

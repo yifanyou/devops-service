@@ -11,9 +11,6 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
  * Created by Zenger on 2018/4/3.
  */
 public interface ApplicationVersionRepository {
-
-    Page<ApplicationVersionE> listApplicationVersion(Long projectId, PageRequest pageRequest, String searchParam);
-
     List<ApplicationLatestVersionDO> listAppLatestVersion(Long projectId);
 
     ApplicationVersionE create(ApplicationVersionE applicationVersionE);
@@ -50,4 +47,6 @@ public interface ApplicationVersionRepository {
     List<ApplicationVersionE> selectUpgradeVersions(Long appVersionId);
 
     void checkProIdAndVerId(Long projectId, Long appVersionId);
+
+    ApplicationVersionE queryByCommitSha(String sha);
 }

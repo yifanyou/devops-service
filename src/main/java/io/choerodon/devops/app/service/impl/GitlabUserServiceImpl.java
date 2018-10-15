@@ -1,6 +1,5 @@
 package io.choerodon.devops.app.service.impl;
 
-import io.choerodon.core.exception.CommonException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +14,6 @@ import io.choerodon.devops.domain.application.repository.UserAttrRepository;
 import io.choerodon.devops.infra.common.util.TypeUtil;
 import io.choerodon.devops.infra.config.GitlabConfigurationProperties;
 
-import java.util.regex.Pattern;
-
 /**
  * Created by Zenger on 2018/3/28.
  */
@@ -29,27 +26,9 @@ public class GitlabUserServiceImpl implements GitlabUserService {
     @Autowired
     private UserAttrRepository userAttrRepository;
 
-    private Pattern pattern = Pattern.compile("[\\w+|\\-|.|_]+");
-
-    private String getValidateGitLabName(String loginName){
-        String removeAtName = loginName.replaceAll("@", "_");
-        if(!pattern.matcher(removeAtName).matches()
-                ||  removeAtName.endsWith(".git")
-                || removeAtName.endsWith(".")
-                || removeAtName.endsWith(".atom")
-                || removeAtName.startsWith("-")){
-            throw new CommonException("error.user.name.illegal");
-        }
-        return removeAtName;
-    }
-
 
     @Override
     public void createGitlabUser(GitlabUserRequestDTO gitlabUserReqDTO) {
-
-        //transfer
-        String validateUserName = getValidateGitLabName(gitlabUserReqDTO.getUsername());
-        gitlabUserReqDTO.setUsername(validateUserName);
 
         GitlabUserE createOrUpdateGitlabUserE = gitlabUserRepository.createGitLabUser(
                 gitlabConfigurationProperties.getPassword(),
@@ -67,20 +46,27 @@ public class GitlabUserServiceImpl implements GitlabUserService {
     @Override
     public void updateGitlabUser(GitlabUserRequestDTO gitlabUserReqDTO) {
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(gitlabUserReqDTO.getExternUid()));
-        gitlabUserRepository.updateGitLabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()),
-                gitlabConfigurationProperties.getProjectLimit(),
-                ConvertHelper.convert(gitlabUserReqDTO, GitlabUserEvent.class));
+        if (userAttrE != null) {
+
+            gitlabUserRepository.updateGitLabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()),
+                    gitlabConfigurationProperties.getProjectLimit(),
+                    ConvertHelper.convert(gitlabUserReqDTO, GitlabUserEvent.class));
+        }
     }
 
     @Override
     public void isEnabledGitlabUser(Integer userId) {
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(userId));
-        gitlabUserRepository.isEnabledGitlabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
+        if (userAttrE != null) {
+            gitlabUserRepository.isEnabledGitlabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
+        }
     }
 
     @Override
     public void disEnabledGitlabUser(Integer userId) {
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(userId));
-        gitlabUserRepository.disEnabledGitlabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
+        if (userAttrE != null) {
+            gitlabUserRepository.disEnabledGitlabUser(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
+        }
     }
 }

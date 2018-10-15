@@ -12,7 +12,6 @@ import io.choerodon.core.convertor.ConvertHelper;
 import io.choerodon.core.convertor.ConvertPageHelper;
 import io.choerodon.core.domain.Page;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.devops.api.dto.DevopsMergeRequestDTO;
 import io.choerodon.devops.domain.application.entity.DevopsMergeRequestE;
 import io.choerodon.devops.domain.application.repository.DevopsMergeRequestRepository;
 import io.choerodon.devops.infra.dataobject.DevopsMergeRequestDO;
@@ -104,6 +103,7 @@ public class DevopsMergeRequestRepositoryImpl implements DevopsMergeRequestRepos
             }
         } else {
             devopsMergeRequestE.setId(mergeRequestId);
+            devopsMergeRequestE.setObjectVersionNumber(mergeRequestETemp.getObjectVersionNumber());
             Integer temp = update(devopsMergeRequestE);
             if (temp == 0) {
                 throw new CommonException("error.update.merge.request");
