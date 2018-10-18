@@ -53,6 +53,7 @@ public class K8sUtil {
             V1ContainerState containerState = containerStatusList.get(i).getState();
             V1ContainerStateTerminated containerStateTerminated = containerState.getTerminated();
             V1ContainerStateWaiting containerStateWaiting = containerState.getWaiting();
+            V1ContainerStateRunning containerStateRunning = containerState.getRunning();
             if(containerStateTerminated != null) {
                 status = getPodStatus(containerStateTerminated);
                 break;
@@ -66,8 +67,12 @@ public class K8sUtil {
         return status;
     }
 
+    private static String getTopPodStatus(String podStatusPhase, String podStatusReason){
+        return podStatusReason != null ? podStatusReason : podStatusPhase;
+    }
+
     private static String getPodStatus(V1ContainerStateTerminated containerStateTerminated) {
-        if (containerStateTerminated.getReason().length() == 0) {
+        if (containerStateTerminated.getReason() != null && containerStateTerminated.getReason().length() == 0) {
             return containerStateTerminated.getSignal() != 0
                     ? INIT + SIGNAL + containerStateTerminated.getSignal()
                     : INIT + EXIT_CODE + containerStateTerminated.getExitCode();
@@ -86,13 +91,14 @@ public class K8sUtil {
         LOGGER.info("changePodStatus start. pod name " + pod.getMetadata().getName());
         String podStatusPhase = pod.getStatus().getPhase();
         String podStatusReason = pod.getStatus().getReason();
-        String status = podStatusReason != null ? podStatusReason : podStatusPhase;
+        String status = getTopPodStatus(podStatusPhase, podStatusReason);
         List<V1ContainerStatus> initContainerStatuses = pod.getStatus().getInitContainerStatuses();
         List<V1ContainerStatus> containerStatusList = pod.getStatus().getContainerStatuses();
         if (!ArrayUtil.isEmpty(initContainerStatuses)) {
             status = getInitContainerStatuses(status, pod);
         }
         if (INIT_CONTAINER_COMPLETED.equals(status) && !ArrayUtil.isEmpty(containerStatusList) && !"Pending".equals(podStatusPhase)) {
+            status = getTopPodStatus(podStatusPhase, podStatusReason);
             status = getContainerStatuses(status, pod);
         }
         LOGGER.info("changePodStatus end. status = " + status);
