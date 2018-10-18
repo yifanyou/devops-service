@@ -33,7 +33,7 @@ public class K8sUtil {
             V1ContainerStateTerminated containerStateTerminated = containerState.getTerminated();
             V1ContainerStateWaiting containerStateWaiting = containerState.getWaiting();
             if (containerStateTerminated != null) {
-                tempStatus = getPodStatus(containerStateTerminated);
+                tempStatus = getPodContainerStatus(containerStateTerminated);
             } else if (containerStateWaiting != null
                     && !containerStateWaiting.getReason().isEmpty()
                     && !"PodInitializing".equals(containerStateWaiting.getReason())) {
@@ -43,7 +43,7 @@ public class K8sUtil {
             }
             if(i==0 || !INIT_CONTAINER_COMPLETED.equals(tempStatus)) { status = tempStatus; }
         }
-        LOGGER.info("getInitContainerStatuses end. status = " + status);
+
         return status;
     }
 
@@ -53,9 +53,8 @@ public class K8sUtil {
             V1ContainerState containerState = containerStatusList.get(i).getState();
             V1ContainerStateTerminated containerStateTerminated = containerState.getTerminated();
             V1ContainerStateWaiting containerStateWaiting = containerState.getWaiting();
-            V1ContainerStateRunning containerStateRunning = containerState.getRunning();
             if(containerStateTerminated != null) {
-                status = getPodStatus(containerStateTerminated);
+                status = getPodContainerStatus(containerStateTerminated);
                 break;
             } else if(containerStateWaiting != null
                     && !containerStateWaiting.getReason().isEmpty()) {
@@ -63,15 +62,14 @@ public class K8sUtil {
                 break;
             }
         }
-        LOGGER.info("getContainerStatuses end. status = " + status);
         return status;
     }
 
-    private static String getTopPodStatus(String podStatusPhase, String podStatusReason){
+    private static String getPodStatus(String podStatusPhase, String podStatusReason){
         return podStatusReason != null ? podStatusReason : podStatusPhase;
     }
 
-    private static String getPodStatus(V1ContainerStateTerminated containerStateTerminated) {
+    private static String getPodContainerStatus(V1ContainerStateTerminated containerStateTerminated) {
         if (containerStateTerminated.getReason() != null && containerStateTerminated.getReason().length() == 0) {
             return containerStateTerminated.getSignal() != 0
                     ? INIT + SIGNAL + containerStateTerminated.getSignal()
@@ -88,20 +86,18 @@ public class K8sUtil {
      * @return string
      */
     public static String changePodStatus(V1Pod pod) {
-        LOGGER.info("changePodStatus start. pod name " + pod.getMetadata().getName());
         String podStatusPhase = pod.getStatus().getPhase();
         String podStatusReason = pod.getStatus().getReason();
-        String status = getTopPodStatus(podStatusPhase, podStatusReason);
+        String status = getPodStatus(podStatusPhase, podStatusReason);
         List<V1ContainerStatus> initContainerStatuses = pod.getStatus().getInitContainerStatuses();
         List<V1ContainerStatus> containerStatusList = pod.getStatus().getContainerStatuses();
         if (!ArrayUtil.isEmpty(initContainerStatuses)) {
             status = getInitContainerStatuses(status, pod);
         }
         if (INIT_CONTAINER_COMPLETED.equals(status) && !ArrayUtil.isEmpty(containerStatusList) && !"Pending".equals(podStatusPhase)) {
-            status = getTopPodStatus(podStatusPhase, podStatusReason);
+            status = getPodStatus(podStatusPhase, podStatusReason);
             status = getContainerStatuses(status, pod);
         }
-        LOGGER.info("changePodStatus end. status = " + status);
         return status;
     }
 
