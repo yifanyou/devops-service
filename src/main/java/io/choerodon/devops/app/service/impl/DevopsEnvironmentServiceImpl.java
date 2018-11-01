@@ -1,15 +1,7 @@
 package io.choerodon.devops.app.service.impl;
 
-import java.io.InputStream;
-import java.util.*;
-import java.util.stream.Collectors;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import io.choerodon.asgard.saga.annotation.Saga;
 import io.choerodon.asgard.saga.dto.StartInstanceDTO;
 import io.choerodon.asgard.saga.feign.SagaClient;
@@ -33,7 +25,17 @@ import io.choerodon.devops.domain.application.valueobject.ProjectHook;
 import io.choerodon.devops.infra.common.util.*;
 import io.choerodon.devops.infra.common.util.enums.InstanceStatus;
 import io.choerodon.devops.infra.dataobject.gitlab.GitlabProjectDO;
+import io.choerodon.devops.infra.dingtalk.channel.RobotChannel;
 import io.choerodon.websocket.helper.EnvListener;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.InputStream;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
@@ -94,15 +96,23 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     private DevopsGitRepository devopsGitRepository;
     @Autowired
     private DevopsEnvCommitRepository devopsEnvCommitRepository;
+    @Autowired
+    @Qualifier("PaasChannel")
+    private RobotChannel robotChannel;
 
+    private static String DEFAULT_PARTITION = "N01";
 
     @Override
     @Saga(code = "devops-create-env", description = "创建环境", inputSchema = "{}")
     public String create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO) {
         //add project prefix
         String code = devopsEnviromentDTO.getCode();
-        devopsEnviromentDTO.setCode(projectId + "-" + code);
+        String partitionCode = devopsEnviromentDTO.getPartition();
+        if(StringUtils.isEmpty(partitionCode)){
+            partitionCode = DEFAULT_PARTITION;
+        }
 
+        devopsEnviromentDTO.setCode(partitionCode + projectId + "-" + code);
 
         DevopsEnvironmentE devopsEnvironmentE = ConvertHelper.convert(devopsEnviromentDTO, DevopsEnvironmentE.class);
         devopsEnvironmentE.initProjectE(projectId);
@@ -123,6 +133,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         devopsEnvironmentE.setEnvIdRsaPub(sshKeys.get(1));
         String repoUrl = String.format("git@%s:%s-%s-gitops/%s.git",
                 gitlabSshUrl, organization.getCode(), projectE.getCode(), devopsEnvironmentE.getCode());
+
         InputStream inputStream = this.getClass().getResourceAsStream("/shell/environment.sh");
         Map<String, String> params = new HashMap<>();
         params.put("{NAMESPACE}", devopsEnvironmentE.getCode());
@@ -134,6 +145,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                 .getId().toString());
         params.put("{RSA}", sshKeys.get(0));
         params.put("{GITREPOURL}", repoUrl);
+
         GitlabGroupE gitlabGroupE = devopsProjectRepository.queryDevopsProject(projectId);
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
         GitlabProjectPayload gitlabProjectPayload = new GitlabProjectPayload();
@@ -142,11 +154,15 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         gitlabProjectPayload.setPath(devopsEnviromentDTO.getCode());
         gitlabProjectPayload.setOrganizationId(null);
         gitlabProjectPayload.setType(ENV);
+
+
         String input = null;
         try {
             input = objectMapper.writeValueAsString(gitlabProjectPayload);
             sagaClient.startSaga("devops-create-env", new StartInstanceDTO(input, "", ""));
-            return FileUtil.replaceReturnString(inputStream, params);
+            String cmd = FileUtil.replaceReturnString(inputStream, params);
+            robotChannel.sendMessageToAll("申请环境", cmd);
+            return cmd;
         } catch (JsonProcessingException e) {
             throw new CommonException(e.getMessage());
         }
@@ -285,7 +301,14 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         params.put("{TOKEN}", devopsEnvironmentE.getToken());
         params.put("{REPOURL}", agentRepoUrl);
         params.put("{ENVID}", devopsEnvironmentE.getId().toString());
-        return FileUtil.replaceReturnString(inputStream, params);
+
+        String cmd = FileUtil.replaceReturnString(inputStream, params);
+        if(update) {
+            robotChannel.sendMessageToAll("申请升级环境", cmd);
+        }else{
+            robotChannel.sendMessageToAll("申请重启环境", cmd);
+        }
+        return cmd;
     }
 
     @Override
