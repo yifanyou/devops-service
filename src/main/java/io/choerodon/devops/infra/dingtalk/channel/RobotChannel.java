@@ -7,7 +7,7 @@ public interface RobotChannel {
     void sendMessage(String title, String message, boolean isAll);
 
     default void sendMessage(String title, MarkDownDomain markDownDomain, boolean isAll){
-        sendMessage(title, markDownDomain, isAll);
+        sendMessage(title, markDownDomain.toMarkDown(), isAll);
     }
 
     default void sendMessageToAll(String title, MarkDownDomain markDownDomain){
