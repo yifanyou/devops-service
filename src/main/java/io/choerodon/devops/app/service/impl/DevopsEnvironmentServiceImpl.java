@@ -369,7 +369,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
 
         String cmd = FileUtil.replaceReturnString(inputStream, params);
 
-        ProjectE projectE = devopsEnvironmentE.getProjectE();
+        ProjectE projectE = iamRepository.queryIamProject(devopsEnvironmentE.getProjectE().getId());
         Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
 
