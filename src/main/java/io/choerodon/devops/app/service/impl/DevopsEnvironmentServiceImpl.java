@@ -107,7 +107,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     @Qualifier("PaasChannel")
     private RobotChannel robotChannel;
 
-    private static String DEFAULT_PARTITION = "N01";
+    private static String DEFAULT_PARTITION = "n01";
 
     @Override
     @Saga(code = "devops-create-env", description = "创建环境", inputSchema = "{}")
@@ -123,7 +123,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
             devopsEnviromentDTO.setPartition(DEFAULT_PARTITION);
         }
 
-        devopsEnviromentDTO.setCode(partitionCode + projectId + "-" + code);
+        devopsEnviromentDTO.setCode(partitionCode.toLowerCase() + projectId + "-" + code);
 
         DevopsEnvironmentE devopsEnvironmentE = ConvertHelper.convert(devopsEnviromentDTO, DevopsEnvironmentE.class);
         devopsEnvironmentE.initProjectE(projectId);
