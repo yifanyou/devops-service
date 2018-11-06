@@ -22,6 +22,12 @@ public class DevopsIngressDTO {
     private String status;
     private List<DevopsIngressPathDTO> pathList;
 
+    /**
+     * if is Empty do not add anything
+     * nginx.ingress.kubernetes.io/rewrite-target: {{ .Values.ingress.rewrite }}
+     */
+    private String rewritePath;
+
     public DevopsIngressDTO() {
     }
 
@@ -120,6 +126,14 @@ public class DevopsIngressDTO {
         this.status = status;
     }
 
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -132,11 +146,12 @@ public class DevopsIngressDTO {
         return Objects.equals(domain, that.domain)
                 && Objects.equals(name, that.name)
                 && Objects.equals(envId, that.envId)
-                && Objects.equals(pathList, that.pathList);
+                && Objects.equals(pathList, that.pathList)
+                && Objects.equals(rewritePath, that.rewritePath);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(domain, name, envId, pathList);
+        return Objects.hash(domain, name, envId, pathList, rewritePath);
     }
 }

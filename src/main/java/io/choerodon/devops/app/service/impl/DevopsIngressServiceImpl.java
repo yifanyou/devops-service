@@ -8,6 +8,7 @@ import java.util.Map;
 import io.kubernetes.client.JSON;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -116,6 +117,18 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
             ingress.getSpec().getRules().get(0).getHttp().addPathsItem(
                     createPath(hostPath, serviceId, servicePort));
         });
+
+        /**
+         * free nginx ingress only support one rewrite-target
+         *
+         */
+        String rewritePath = devopsIngressDTO.getRewritePath();
+        if(!StringUtils.isEmpty(rewritePath)){
+            DevopsIngressValidator.checkPath(rewritePath);
+            Map<String, String> annotations = new HashMap<>();
+            annotations.put("nginx.ingress.kubernetes.io/rewrite-target", rewritePath);
+            ingress.getMetadata().setAnnotations(annotations);
+        }
 
         DevopsIngressDO devopsIngressDO = new DevopsIngressDO(projectId, envId, domain, ingressName);
         devopsIngressDO.setStatus(IngressStatus.OPERATING.getStatus());
