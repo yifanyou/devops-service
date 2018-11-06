@@ -229,7 +229,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         domain.setEnvDesc(envDesc);
         domain.setPartition(partition);
         domain.setApplicationTime(LocalDateTime.now().toString());
-        domain.setCmd(cmd);
+        domain.setCmd(cmd.replace("\\", ""));
 
         return domain;
     }
