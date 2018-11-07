@@ -1,15 +1,7 @@
 package io.choerodon.devops.app.service.impl;
 
-import java.io.InputStream;
-import java.util.*;
-import java.util.stream.Collectors;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import io.choerodon.asgard.saga.annotation.Saga;
 import io.choerodon.asgard.saga.dto.StartInstanceDTO;
 import io.choerodon.asgard.saga.feign.SagaClient;
@@ -33,7 +25,21 @@ import io.choerodon.devops.domain.application.valueobject.ProjectHook;
 import io.choerodon.devops.infra.common.util.*;
 import io.choerodon.devops.infra.common.util.enums.InstanceStatus;
 import io.choerodon.devops.infra.dataobject.gitlab.GitlabProjectDO;
+import io.choerodon.devops.infra.dingtalk.channel.RobotChannel;
+import io.choerodon.devops.infra.dingtalk.domain.EnvApplicationDomain;
 import io.choerodon.websocket.helper.EnvListener;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 /**
@@ -68,6 +74,8 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     @Value("${services.gitlab.url}")
     private String gitlabUrl;
 
+    private Pattern pattern = Pattern.compile("([nNPpFf]\\d{2})(\\d+)-(.+)");
+
     @Autowired
     private IamRepository iamRepository;
     @Autowired
@@ -95,14 +103,27 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     @Autowired
     private DevopsEnvCommitRepository devopsEnvCommitRepository;
 
+    @Autowired
+    @Qualifier("PaasChannel")
+    private RobotChannel robotChannel;
+
+    private static String DEFAULT_PARTITION = "n01";
 
     @Override
     @Saga(code = "devops-create-env", description = "创建环境", inputSchema = "{}")
     public String create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO) {
         //add project prefix
         String code = devopsEnviromentDTO.getCode();
-        devopsEnviromentDTO.setCode(projectId + "-" + code);
+        String partitionCode = devopsEnviromentDTO.getPartition();
+        if(StringUtils.isEmpty(partitionCode)){
+            partitionCode = DEFAULT_PARTITION;
+            /**
+             * setback for further use
+             */
+            devopsEnviromentDTO.setPartition(DEFAULT_PARTITION);
+        }
 
+        devopsEnviromentDTO.setCode(partitionCode.toLowerCase() + projectId + "-" + code);
 
         DevopsEnvironmentE devopsEnvironmentE = ConvertHelper.convert(devopsEnviromentDTO, DevopsEnvironmentE.class);
         devopsEnvironmentE.initProjectE(projectId);
@@ -123,6 +144,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         devopsEnvironmentE.setEnvIdRsaPub(sshKeys.get(1));
         String repoUrl = String.format("git@%s:%s-%s-gitops/%s.git",
                 gitlabSshUrl, organization.getCode(), projectE.getCode(), devopsEnvironmentE.getCode());
+
         InputStream inputStream = this.getClass().getResourceAsStream("/shell/environment.sh");
         Map<String, String> params = new HashMap<>();
         params.put("{NAMESPACE}", devopsEnvironmentE.getCode());
@@ -134,6 +156,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                 .getId().toString());
         params.put("{RSA}", sshKeys.get(0));
         params.put("{GITREPOURL}", repoUrl);
+
         GitlabGroupE gitlabGroupE = devopsProjectRepository.queryDevopsProject(projectId);
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
         GitlabProjectPayload gitlabProjectPayload = new GitlabProjectPayload();
@@ -142,14 +165,73 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         gitlabProjectPayload.setPath(devopsEnviromentDTO.getCode());
         gitlabProjectPayload.setOrganizationId(null);
         gitlabProjectPayload.setType(ENV);
+
         String input = null;
         try {
             input = objectMapper.writeValueAsString(gitlabProjectPayload);
             sagaClient.startSaga("devops-create-env", new StartInstanceDTO(input, "", ""));
-            return FileUtil.replaceReturnString(inputStream, params);
+            String cmd = FileUtil.replaceReturnString(inputStream, params);
+
+            /**
+             * Assemble the env domain
+             */
+            /**
+             * get org info
+             */
+
+            EnvApplicationDomain domain = assembleEnvDomain("申请环境"
+                    , organization
+                    , projectE
+                    , userAttrE
+                    , devopsEnviromentDTO.getName()
+                    , devopsEnviromentDTO.getDescription()
+                    , devopsEnviromentDTO.getPartition()
+                    , cmd
+            );
+            robotChannel.sendMessageToAll("申请环境", domain);
+            return cmd;
         } catch (JsonProcessingException e) {
             throw new CommonException(e.getMessage());
         }
+    }
+
+    private EnvApplicationDomain assembleEnvDomain(String type,
+                                                   Organization organization,
+                                                   ProjectE projectE,
+                                                   UserAttrE userAttrE,
+                                                   String envName,
+                                                   String envDesc,
+                                                   String partition,
+                                                   String cmd
+                                                   ){
+        EnvApplicationDomain domain = new EnvApplicationDomain();
+        domain.setType(type);
+        String orgSb = organization.getName() +
+                "|" +
+                organization.getId() +
+                "|" +
+                organization.getCode();
+        domain.setOrganizationInfo(orgSb);
+
+        String prjSb = projectE.getName() +
+                "|" +
+                projectE.getId() +
+                "|" +
+                projectE.getCode();
+        domain.setProjectInfo(prjSb);
+
+        String usrSb = userAttrE.getId().toString();
+        domain.setUserInfo(usrSb);
+
+        domain.setType(type);
+
+        domain.setEnvName(envName);
+        domain.setEnvDesc(envDesc);
+        domain.setPartition(partition);
+        domain.setApplicationTime(LocalDateTime.now().toString());
+        domain.setCmd(cmd.replace("\\", ""));
+
+        return domain;
     }
 
     @Override
@@ -167,7 +249,6 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                             t.setUpdate(true);
                             t.initConnect(false);
                             t.setUpdateMessage("Version is too low, please upgrade!");
-
                         }
                     } else {
                         t.initConnect(false);
@@ -285,7 +366,48 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         params.put("{TOKEN}", devopsEnvironmentE.getToken());
         params.put("{REPOURL}", agentRepoUrl);
         params.put("{ENVID}", devopsEnvironmentE.getId().toString());
-        return FileUtil.replaceReturnString(inputStream, params);
+
+        String cmd = FileUtil.replaceReturnString(inputStream, params);
+
+        ProjectE projectE = iamRepository.queryIamProject(devopsEnvironmentE.getProjectE().getId());
+        Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
+        UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
+
+        EnvApplicationDomain domain;
+
+        if(update) {
+            domain = assembleEnvDomain("申请升级环境"
+                    , organization
+                    , projectE
+                    , userAttrE
+                    , devopsEnvironmentE.getName()
+                    , devopsEnvironmentE.getDescription()
+                    , extractPartition(devopsEnvironmentE.getCode())
+                    , cmd
+            );
+            robotChannel.sendMessageToAll("申请升级环境", domain);
+        }else{
+            domain = assembleEnvDomain("申请重启环境"
+                    , organization
+                    , projectE
+                    , userAttrE
+                    , devopsEnvironmentE.getName()
+                    , devopsEnvironmentE.getDescription()
+                    , extractPartition(devopsEnvironmentE.getCode())
+                    , cmd
+            );
+            robotChannel.sendMessageToAll("申请重启环境", domain);
+        }
+        return cmd;
+    }
+
+    private String extractPartition(String code){
+        Matcher match = pattern.matcher(code);
+        if(match.matches()){
+            return match.group(1);
+        }else{
+            return DEFAULT_PARTITION;
+        }
     }
 
     @Override
