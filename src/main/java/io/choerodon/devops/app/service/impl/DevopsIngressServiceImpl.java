@@ -90,6 +90,8 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
         V1beta1Ingress ingress = createIngress(domain, ingressName);
         List<DevopsIngressPathDO> devopsIngressPathDOS = new ArrayList<>();
         List<String> pathCheckList = new ArrayList<>();
+
+
         pathList.forEach(t -> {
             Long serviceId = t.getServiceId();
             Long servicePort = t.getServicePort();
@@ -116,19 +118,19 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                     devopsServiceE.getId(), devopsServiceE.getName(), servicePort));
             ingress.getSpec().getRules().get(0).getHttp().addPathsItem(
                     createPath(hostPath, serviceId, servicePort));
-        });
 
-        /**
-         * free nginx ingress only support one rewrite-target
-         *
-         */
-        String rewritePath = devopsIngressDTO.getRewritePath();
-        if(!StringUtils.isEmpty(rewritePath)){
-            DevopsIngressValidator.checkPath(rewritePath);
-            Map<String, String> annotations = new HashMap<>();
-            annotations.put("nginx.ingress.kubernetes.io/rewrite-target", rewritePath);
-            ingress.getMetadata().setAnnotations(annotations);
-        }
+            /**
+             * free nginx ingress only supports one rewrite-target
+             *  overwrite multi-times is a simple way
+             */
+            String rewritePath = t.getRewritePath();
+            if(!StringUtils.isEmpty(rewritePath)){
+                DevopsIngressValidator.checkPath(rewritePath);
+                Map<String, String> annotations = new HashMap<>();
+                annotations.put("nginx.ingress.kubernetes.io/rewrite-target", rewritePath);
+                ingress.getMetadata().setAnnotations(annotations);
+            }
+        });
 
         DevopsIngressDO devopsIngressDO = new DevopsIngressDO(projectId, envId, domain, ingressName);
         devopsIngressDO.setStatus(IngressStatus.OPERATING.getStatus());
@@ -195,6 +197,18 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                 devopsIngressPathDOS.add(devopsIngressPathDO);
                 ingress.getSpec().getRules().get(0).getHttp()
                         .addPathsItem(createPath(path, serviceId, servicePort));
+
+                /**
+                 * free nginx ingress only supports one rewrite-target
+                 *  overwrite multi-times is a simple way
+                 */
+                String rewritePath = t.getRewritePath();
+                if(!StringUtils.isEmpty(rewritePath)){
+                    DevopsIngressValidator.checkPath(rewritePath);
+                    Map<String, String> annotations = new HashMap<>();
+                    annotations.put("nginx.ingress.kubernetes.io/rewrite-target", rewritePath);
+                    ingress.getMetadata().setAnnotations(annotations);
+                }
             });
 
             DevopsIngressDO devopsIngressDO = new DevopsIngressDO(
@@ -217,7 +231,6 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                         devopsEnvironmentE.getId(), path, devopsIngressDO, devopsIngressPathDOS, userAttrE);
             }
         }
-
     }
 
     @Override
