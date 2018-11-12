@@ -77,7 +77,7 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
     @Override
     public void addIngress(DevopsIngressDTO devopsIngressDTO, Long projectId, boolean gitOps) {
         Long envId = devopsIngressDTO.getEnvId();
-        envUtil.checkEnvConnection(envId, envListener);
+       //envUtil.checkEnvConnection(envId, envListener);
         String ingressName = devopsIngressDTO.getName();
         DevopsIngressValidator.checkIngressName(ingressName);
         String domain = devopsIngressDTO.getDomain();
