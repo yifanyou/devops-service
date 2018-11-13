@@ -25,3 +25,8 @@ nbdist/
 .nb-gradle/
 application-default.yml
 init-local-database.sh
+
+### Doxygen ###
+html/**
+latex/**
+Doxyfile
