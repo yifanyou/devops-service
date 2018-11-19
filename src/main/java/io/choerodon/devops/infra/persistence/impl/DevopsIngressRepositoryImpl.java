@@ -8,6 +8,7 @@ import java.util.Map;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,10 +17,8 @@ import io.choerodon.core.domain.Page;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.devops.api.dto.DevopsIngressDTO;
 import io.choerodon.devops.api.dto.DevopsIngressPathDTO;
-import io.choerodon.devops.domain.application.entity.DevopsEnvironmentE;
-import io.choerodon.devops.domain.application.entity.DevopsIngressE;
-import io.choerodon.devops.domain.application.entity.DevopsIngressPathE;
-import io.choerodon.devops.domain.application.entity.DevopsServiceE;
+import io.choerodon.devops.domain.application.entity.*;
+import io.choerodon.devops.domain.application.repository.CertificationRepository;
 import io.choerodon.devops.domain.application.repository.DevopsEnvironmentRepository;
 import io.choerodon.devops.domain.application.repository.DevopsIngressRepository;
 import io.choerodon.devops.domain.application.repository.DevopsServiceRepository;
@@ -46,6 +45,7 @@ import io.choerodon.websocket.helper.EnvSession;
 public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     private static final String DOMAIN_NAME_EXIST_ERROR = "error.domain.name.exist";
     private static final Gson gson = new Gson();
+
     @Value("${agent.version}")
     private String agentExpectVersion;
     private DevopsIngressMapper devopsIngressMapper;
@@ -53,6 +53,9 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     private DevopsEnvironmentRepository environmentRepository;
     private DevopsServiceRepository devopsServiceRepository;
     private EnvListener envListener;
+
+    @Autowired
+    private CertificationRepository certificationRepository;
 
     /**
      * 构造函数
@@ -70,19 +73,20 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     }
 
     @Override
-    public void createIngress(DevopsIngressDO devopsIngressDO, List<DevopsIngressPathDO> devopsIngressPathDOList) {
+    public DevopsIngressDO createIngress(DevopsIngressDO devopsIngressDO) {
         if (!checkIngressName(devopsIngressDO.getEnvId(), devopsIngressDO.getName())) {
             throw new CommonException(DOMAIN_NAME_EXIST_ERROR);
         }
         devopsIngressMapper.insert(devopsIngressDO);
-        devopsIngressPathDOList.forEach(t -> {
+        devopsIngressDO.getDevopsIngressPathDOS().forEach(t -> {
             t.setIngressId(devopsIngressDO.getId());
             devopsIngressPathMapper.insert(t);
         });
+        return devopsIngressDO;
     }
 
     @Override
-    public void updateIngress(DevopsIngressDO devopsIngressDO, List<DevopsIngressPathDO> devopsIngressPathDOList) {
+    public void updateIngressAndIngressPath(DevopsIngressDO devopsIngressDO) {
         Long id = devopsIngressDO.getId();
         DevopsIngressDO ingressDO = devopsIngressMapper.selectByPrimaryKey(id);
         if (ingressDO == null) {
@@ -97,9 +101,9 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
             devopsIngressMapper.updateByPrimaryKey(devopsIngressDO);
         }
         List<DevopsIngressPathDO> ingressPathList = devopsIngressPathMapper.select(new DevopsIngressPathDO(id));
-        if (!devopsIngressPathDOList.equals(ingressPathList)) {
+        if (!devopsIngressDO.getDevopsIngressPathDOS().equals(ingressPathList)) {
             devopsIngressPathMapper.delete(new DevopsIngressPathDO(id));
-            devopsIngressPathDOList.forEach(t -> {
+            devopsIngressDO.getDevopsIngressPathDOS().forEach(t -> {
                 t.setIngressId(id);
                 devopsIngressPathMapper.insert(t);
             });
@@ -117,16 +121,15 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
                 && !checkIngressName(devopsIngressDO.getEnvId(), devopsIngressDO.getName())) {
             throw new CommonException(DOMAIN_NAME_EXIST_ERROR);
         }
-        if (!ingressDO.equals(devopsIngressDO)) {
-            devopsIngressDO.setObjectVersionNumber(ingressDO.getObjectVersionNumber());
-            devopsIngressMapper.updateByPrimaryKey(devopsIngressDO);
-        }
+        devopsIngressDO.setObjectVersionNumber(ingressDO.getObjectVersionNumber());
+        devopsIngressMapper.updateByPrimaryKeySelective(devopsIngressDO);
     }
 
     @Override
     public Page<DevopsIngressDTO> getIngress(Long projectId, Long envId, PageRequest pageRequest, String params) {
         List<DevopsIngressDTO> devopsIngressDTOS = new ArrayList<>();
-        Map<String, Object> maps = gson.fromJson(params, new TypeToken<Map<String, Object>>() {}.getType());
+        Map<String, Object> maps = gson.fromJson(params, new TypeToken<Map<String, Object>>() {
+        }.getType());
         Map<String, Object> searchParamMap = TypeUtil.cast(maps.get(TypeUtil.SEARCH_PARAM));
         String paramMap = TypeUtil.cast(maps.get(TypeUtil.PARAM));
 
@@ -146,6 +149,10 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
                     new DevopsIngressDTO(t.getId(), t.getDomain(), t.getName(),
                             t.getEnvId(), t.getUsable(), t.getEnvName());
             devopsIngressDTO.setStatus(t.getStatus());
+            devopsIngressDTO.setCommandStatus(t.getCommandStatus());
+            devopsIngressDTO.setCommandType(t.getCommandType());
+            devopsIngressDTO.setError(t.getError());
+            setIngressDTOCert(t.getCertId(), devopsIngressDTO);
             for (Map.Entry<String, EnvSession> entry : envs.entrySet()) {
                 EnvSession envSession = entry.getValue();
                 if (envSession.getEnvId().equals(t.getEnvId())
@@ -175,6 +182,7 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
             DevopsIngressPathDO devopsIngressPathDO = new DevopsIngressPathDO(ingressId);
             devopsIngressPathMapper.select(devopsIngressPathDO).forEach(e -> getDevopsIngressDTO(devopsIngressDTO, e));
             devopsIngressDTO.setStatus(devopsIngressDO.getStatus());
+            setIngressDTOCert(devopsIngressDO.getCertId(), devopsIngressDTO);
             return devopsIngressDTO;
         }
 
@@ -184,6 +192,17 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     @Override
     public DevopsIngressDO getIngress(Long ingressId) {
         return devopsIngressMapper.selectByPrimaryKey(ingressId);
+    }
+
+    private void setIngressDTOCert(Long certId, DevopsIngressDTO devopsIngressDTO) {
+        if (certId != null) {
+            devopsIngressDTO.setCertId(certId);
+            CertificationE certificationE = certificationRepository.queryById(certId);
+            if (certificationE != null) {
+                devopsIngressDTO.setCertName(certificationE.getName());
+                devopsIngressDTO.setCertStatus(certificationE.getStatus());
+            }
+        }
     }
 
     @Override

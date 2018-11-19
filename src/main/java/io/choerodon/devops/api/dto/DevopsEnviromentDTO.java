@@ -9,6 +9,7 @@ public class DevopsEnviromentDTO {
     private String name;
     private String code;
     private String description;
+    private Long devopsEnvGroupId;
     private String partition;
 
     public Long getProjectId() {
@@ -41,6 +42,14 @@ public class DevopsEnviromentDTO {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Long getDevopsEnvGroupId() {
+        return devopsEnvGroupId;
+    }
+
+    public void setDevopsEnvGroupId(Long devopsEnvGroupId) {
+        this.devopsEnvGroupId = devopsEnvGroupId;
     }
 
     public String getPartition() {

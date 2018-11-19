@@ -9,6 +9,7 @@ import io.choerodon.devops.domain.application.entity.DevopsBranchE;
 import io.choerodon.devops.domain.application.entity.gitlab.CommitE;
 import io.choerodon.devops.domain.application.entity.gitlab.CompareResultsE;
 import io.choerodon.devops.infra.dataobject.gitlab.BranchDO;
+import io.choerodon.devops.infra.dataobject.gitlab.CommitDO;
 import io.choerodon.devops.infra.dataobject.gitlab.TagDO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
@@ -20,7 +21,9 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
  */
 public interface DevopsGitRepository {
 
-    void createTag(Integer gitLabProjectId, String tag, String ref, Integer userId);
+    void createTag(Integer gitLabProjectId, String tag, String ref, String msg, String releaseNotes, Integer userId);
+
+    TagDO updateTag(Integer gitLabProjectId, String tag, String releaseNotes, Integer userId);
 
     void deleteTag(Integer gitLabProjectId, String tag, Integer userId);
 
@@ -72,4 +75,8 @@ public interface DevopsGitRepository {
     DevopsBranchE queryByBranchNameAndCommit(String branchName, String commit);
 
     CommitE getCommit(Integer gitLabProjectId, String commit, Integer userId);
+
+    List<CommitDO> getCommits(Integer gitLabProjectId, String branchName, String date);
+
+    List<BranchDO> listBranches(Integer gitlabProjectId, Integer userId);
 }

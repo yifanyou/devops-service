@@ -43,37 +43,10 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
     private IamRepository iamRepository;
 
     @Override
-    public Page<ApplicationVersionE> listApplicationVersion(Long projectId, PageRequest pageRequest, String searchParam) {
-        if (pageRequest.getSort() != null) {
-            Map<String, String> map = new HashMap<>();
-            map.put("version", "dav.version");
-            map.put(APP_CODE, APP_CODE);
-            map.put(APP_NAME, APP_NAME);
-            map.put("creationDate", "dav.creation_date");
-            pageRequest.resetOrder("dav", map);
-        }
-
-        Page<ApplicationVersionDO> applicationVersionQueryDOPage;
-        if (!StringUtils.isEmpty(searchParam)) {
-            Map<String, Object> searchParamMap = json.deserialize(searchParam, Map.class);
-            applicationVersionQueryDOPage = PageHelper.doPageAndSort(
-                    pageRequest, () -> applicationVersionMapper.listApplicationVersion(
-                            projectId,
-                            null,
-                            TypeUtil.cast(searchParamMap.get(TypeUtil.SEARCH_PARAM)),
-                            TypeUtil.cast(searchParamMap.get(TypeUtil.PARAM))));
-        } else {
-            applicationVersionQueryDOPage = PageHelper.doPageAndSort(
-                    pageRequest, () -> applicationVersionMapper.listApplicationVersion(projectId, null, null, null));
-        }
-        return ConvertPageHelper.convertPage(applicationVersionQueryDOPage, ApplicationVersionE.class);
-    }
-
-    @Override
     public List<ApplicationLatestVersionDO> listAppLatestVersion(Long projectId) {
         ProjectE projectE = iamRepository.queryIamProject(projectId);
         Long organizationId = projectE.getOrganization().getId();
-        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(organizationId);
+        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(organizationId, null);
         List<Long> projectIds = projectEList.parallelStream().map(ProjectE::getId)
                 .collect(Collectors.toCollection(ArrayList::new));
 
@@ -203,7 +176,7 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
 
     @Override
     public String getReadme(Long versionId) {
-        String readme = "";
+        String readme;
         try {
             readme = applicationVersionReadmeMapper.selectOne(new ApplicationVersionReadmeDO(versionId)).getReadme();
         } catch (Exception ignore) {
@@ -246,5 +219,12 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
         if (index == 0) {
             throw new CommonException("error.project.AppVersion.notExist");
         }
+    }
+
+    @Override
+    public ApplicationVersionE queryByCommitSha(String sha) {
+        ApplicationVersionDO applicationVersionDO = new ApplicationVersionDO();
+        applicationVersionDO.setCommit(sha);
+        return ConvertHelper.convert(applicationVersionMapper.selectOne(applicationVersionDO), ApplicationVersionE.class);
     }
 }

@@ -19,7 +19,7 @@ public interface IamRepository {
 
     UserE queryByLoginName(String userName);
 
-    List<ProjectE> listIamProjectByOrgId(Long organizationId);
+    List<ProjectE> listIamProjectByOrgId(Long organizationId, String name);
 
     UserE queryById(Long id);
 
@@ -28,4 +28,6 @@ public interface IamRepository {
     List<UserE> listUsersByIds(List<Long> ids);
 
     UserE queryUserByUserId(Long id);
+
+    UserE queryByEmail(Long projectId, String email);
 }

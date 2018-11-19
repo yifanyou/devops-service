@@ -12,6 +12,7 @@ import io.choerodon.devops.domain.application.entity.gitlab.CompareResultsE;
 import io.choerodon.devops.domain.application.event.GitlabUserEvent;
 import io.choerodon.devops.domain.application.valueobject.ProjectHook;
 import io.choerodon.devops.domain.application.valueobject.RepositoryFile;
+import io.choerodon.devops.domain.application.valueobject.Variable;
 import io.choerodon.devops.infra.dataobject.gitlab.*;
 import io.choerodon.devops.infra.feign.fallback.GitlabServiceClientFallback;
 
@@ -83,6 +84,21 @@ public interface GitlabServiceClient {
     @DeleteMapping(value = "/v1/projects/{projectId}")
     ResponseEntity deleteProject(@PathVariable("projectId") Integer projectId,
                                  @RequestParam("userId") Integer userId);
+
+    @DeleteMapping(value = "/v1/projects/{groupName}/{projectName}")
+    ResponseEntity deleteProjectByProjectName(@PathVariable("groupName") String groupName,
+                                 @PathVariable("projectName") String projectName,
+                                              @RequestParam("userId") Integer userId);
+
+    @GetMapping(value = "/v1/projects/queryByName")
+    ResponseEntity<GitlabProjectDO> getProjectByName(@RequestParam("userId") Integer userId,
+                                                     @RequestParam("groupName") String groupName,
+                                                     @RequestParam("projectName") String projectName);
+
+
+    @GetMapping(value = "/v1/projects/{projectId}/variable")
+    ResponseEntity<List<Variable>> getVariable(@PathVariable("projectId") Integer projectId,
+                                               @RequestParam("userId") Integer userId);
 
 
     @PostMapping(value = "/v1/users/{userId}/impersonation_tokens")
@@ -160,6 +176,12 @@ public interface GitlabServiceClient {
     ResponseEntity<CommitDO> getCommit(@PathVariable("projectId") Integer projectId,
                                        @RequestParam("sha") String sha,
                                        @RequestParam("userId") Integer userId);
+
+    @GetMapping(value = "/v1/projects/{projectId}/repository/commits/project")
+    ResponseEntity<List<CommitDO>> listCommits(@PathVariable("projectId") Integer projectId,
+                                               @RequestParam("page") Integer page,
+                                               @RequestParam("size") Integer size,
+                                               @RequestParam("userId") Integer userId);
 
     @GetMapping(value = "/v1/projects/{projectId}/repository/commits/statuse")
     ResponseEntity<List<CommitStatuseDO>> getCommitStatuse(@PathVariable("projectId") Integer projectId,
@@ -275,6 +297,23 @@ public interface GitlabServiceClient {
             @PathVariable("projectId") Integer projectId,
             @RequestParam("name") String name,
             @RequestParam("ref") String ref,
+            @RequestParam(value = "message", required = false, defaultValue = "") String message,
+            @RequestBody(required = false) String releaseNotes,
+            @RequestParam("userId") Integer userId);
+
+    /**
+     * 更新 tag
+     *
+     * @param projectId    项目id
+     * @param name         标签名
+     * @param releaseNotes 发布日志
+     * @return Tag
+     */
+    @PutMapping("/v1/projects/{projectId}/repository/tags")
+    ResponseEntity<TagDO> updateTagRelease(
+            @PathVariable("projectId") Integer projectId,
+            @RequestParam("name") String name,
+            @RequestBody(required = false) String releaseNotes,
             @RequestParam("userId") Integer userId);
 
     /**
@@ -360,4 +399,25 @@ public interface GitlabServiceClient {
             @RequestParam("projectId") Integer projectId,
             @RequestParam("userId") Integer userId,
             @RequestBody ProjectHook projectHook);
+
+    @PutMapping("/v1/hook")
+    ResponseEntity<ProjectHook> updateProjectHook(
+            @RequestParam("projectId") Integer projectId,
+            @RequestParam("hookId") Integer hookId,
+            @RequestParam("userId") Integer userId);
+
+
+    @GetMapping("/v1/hook")
+    ResponseEntity<List<ProjectHook>> getProjectHook(
+            @RequestParam("projectId") Integer projectId,
+            @RequestParam("userId") Integer userId);
+
+
+    @PutMapping("/v1/groups/{groupId}")
+    ResponseEntity updateGroup(@PathVariable("groupId") Integer groupId,
+                               @RequestParam("userId") Integer userId,
+                               @RequestBody @Valid GroupDO group
+    );
+
+
 }

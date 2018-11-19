@@ -1,5 +1,7 @@
 package io.choerodon.devops.domain.application.valueobject;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class Error {
     private String id;
     private String path;

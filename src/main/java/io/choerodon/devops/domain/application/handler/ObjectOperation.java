@@ -17,16 +17,18 @@ import io.choerodon.core.exception.CommonException;
 import io.choerodon.devops.domain.application.entity.DevopsEnvFileResourceE;
 import io.choerodon.devops.domain.application.repository.DevopsEnvFileResourceRepository;
 import io.choerodon.devops.domain.application.repository.GitlabRepository;
+import io.choerodon.devops.domain.application.valueobject.C7nCertification;
 import io.choerodon.devops.domain.application.valueobject.C7nHelmRelease;
 import io.choerodon.devops.infra.common.util.SkipNullRepresenterUtil;
 import io.choerodon.devops.infra.common.util.TypeUtil;
 
 public class ObjectOperation<T> {
 
-    private String C7NTAG = "!!io.choerodon.devops.domain.application.valueobject.C7nHelmRelease";
-    private String INGTAG = "!!io.kubernetes.client.models.V1beta1Ingress";
-    private String SVCTAG = "!!io.kubernetes.client.models.V1Service";
-
+    public static final String UPDATE = "update";
+    private static final String C7NTAG = "!!io.choerodon.devops.domain.application.valueobject.C7nHelmRelease";
+    private static final String INGTAG = "!!io.kubernetes.client.models.V1beta1Ingress";
+    private static final String SVCTAG = "!!io.kubernetes.client.models.V1Service";
+    private static final String CERTTAG = "!!io.choerodon.devops.domain.application.valueobject.C7nCertification";
     private T type;
 
     public T getType() {
@@ -45,7 +47,8 @@ public class ObjectOperation<T> {
      * @param operationType      operation type
      * @param userId             GitLab user ID
      */
-    public void operationEnvGitlabFile(String fileCode, Integer gitlabEnvProjectId, String operationType, Long userId, Long objectId, String objectType, Long envId, String filePath) {
+    public void operationEnvGitlabFile(String fileCode, Integer gitlabEnvProjectId, String operationType,
+                                       Long userId, Long objectId, String objectType, Long envId, String filePath) {
         GitlabRepository gitlabRepository = ApplicationContextHelper.getSpringFactory().getBean(GitlabRepository.class);
         Tag tag = new Tag(type.getClass().toString());
         Yaml yaml = getYamlObject(tag);
@@ -61,7 +64,8 @@ public class ObjectOperation<T> {
             if (devopsEnvFileResourceE == null) {
                 throw new CommonException("error.fileResource.not.exist");
             }
-            gitlabRepository.updateFile(gitlabEnvProjectId, devopsEnvFileResourceE.getFilePath(), getUpdateContent(type, devopsEnvFileResourceE.getFilePath(), objectType, filePath, operationType),
+            gitlabRepository.updateFile(gitlabEnvProjectId, devopsEnvFileResourceE.getFilePath(), getUpdateContent(type,
+                    devopsEnvFileResourceE.getFilePath(), objectType, filePath, operationType),
                     "UPDATE FILE", TypeUtil.objToInteger(userId));
         }
     }
@@ -71,65 +75,94 @@ public class ObjectOperation<T> {
         skipNullRepresenter.addClassTag(type.getClass(), tag);
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        Yaml yaml = new Yaml(skipNullRepresenter, options);
-        return yaml;
+        options.setAllowReadOnlyProperties(true);
+        return new Yaml(skipNullRepresenter, options);
     }
-
 
     private String getUpdateContent(T t, String filePath, String objectType, String path, String operationType) {
         Yaml yaml = new Yaml();
-        String result = "";
-        File file = new File(path + "/" + filePath);
+        StringBuilder resultBuilder = new StringBuilder();
+        File file = new File(String.format("%s/%s", path, filePath));
         try {
             for (Object data : yaml.loadAll(new FileInputStream(file))) {
                 JSONObject jsonObject = new JSONObject((Map<String, Object>) data);
-                String type = jsonObject.get("kind").toString();
-                switch (type) {
+                switch (jsonObject.get("kind").toString()) {
                     case "C7NHelmRelease":
-                        Yaml yaml1 = new Yaml();
-                        C7nHelmRelease c7nHelmRelease = yaml1.loadAs(jsonObject.toJSONString(), C7nHelmRelease.class);
-                        if (objectType.equals("C7NHelmRelease") && c7nHelmRelease.getMetadata().getName().equals(((C7nHelmRelease) t).getMetadata().getName())) {
-                            if (operationType.equals("update")) {
-                                c7nHelmRelease = (C7nHelmRelease) t;
-                            } else {
-                                break;
-                            }
-                        }
-                        Tag tag1 = new Tag(C7NTAG);
-                        result = result + "\n" + getYamlObject(tag1).dump(c7nHelmRelease).replace(C7NTAG, "---");
+                        handleC7nHelmRelease(t, objectType, operationType, resultBuilder, jsonObject);
                         break;
                     case "Ingress":
-                        Yaml yaml2 = new Yaml();
-                        V1beta1Ingress v1beta1Ingress = yaml2.loadAs(jsonObject.toJSONString(), V1beta1Ingress.class);
-                        if (objectType.equals("Ingress") && v1beta1Ingress.getMetadata().getName().equals(((V1beta1Ingress) t).getMetadata().getName())) {
-                            if (operationType.equals("update")) {
-                                v1beta1Ingress = (V1beta1Ingress) t;
-                            } else {
-                                break;
-                            }
-                        }
-                        Tag tag2 = new Tag(INGTAG);
-                        result = result + "\n" + getYamlObject(tag2).dump(v1beta1Ingress).replace(INGTAG, "---");
+                        handleIngress(t, objectType, operationType, resultBuilder, jsonObject);
                         break;
                     case "Service":
-                        Yaml yaml3 = new Yaml();
-                        V1Service v1Service = yaml3.loadAs(jsonObject.toJSONString(), V1Service.class);
-                        if (objectType.equals("Service") && v1Service.getMetadata().getName().equals(((V1Service) t).getMetadata().getName())) {
-                            if (operationType.equals("update")) {
-                                v1Service = (V1Service) t;
-                            } else {
-                                break;
-                            }
-                        }
-                        Tag tag3 = new Tag(SVCTAG);
-                        result = result + "\n" + getYamlObject(tag3).dump(v1Service).replace(SVCTAG, "---");
+                        handleService(t, objectType, operationType, resultBuilder, jsonObject);
+                        break;
+                    case "C7nCertification":
+                        handleC7nCertification(t, objectType, operationType, resultBuilder, jsonObject);
+                        break;
+                    default:
                         break;
                 }
             }
-            return result;
+            return resultBuilder.toString();
         } catch (FileNotFoundException e) {
             throw new CommonException(e.getMessage());
         }
     }
 
+    private void handleService(T t, String objectType, String operationType, StringBuilder resultBuilder, JSONObject jsonObject) {
+        Yaml yaml3 = new Yaml();
+        V1Service v1Service = yaml3.loadAs(jsonObject.toJSONString(), V1Service.class);
+        if (objectType.equals("Service") && v1Service.getMetadata().getName().equals(((V1Service) t).getMetadata().getName())) {
+            if (operationType.equals(UPDATE)) {
+                v1Service = (V1Service) t;
+            } else {
+                return;
+            }
+        }
+        Tag tag3 = new Tag(SVCTAG);
+        resultBuilder.append("\n").append(getYamlObject(tag3).dump(v1Service).replace(SVCTAG, "---"));
+    }
+
+    private void handleIngress(T t, String objectType, String operationType, StringBuilder resultBuilder, JSONObject jsonObject) {
+        Yaml yaml2 = new Yaml();
+        V1beta1Ingress v1beta1Ingress = yaml2.loadAs(jsonObject.toJSONString(), V1beta1Ingress.class);
+        if (objectType.equals("Ingress") && v1beta1Ingress.getMetadata().getName().equals(((V1beta1Ingress) t).getMetadata().getName())) {
+            if (operationType.equals(UPDATE)) {
+                v1beta1Ingress = (V1beta1Ingress) t;
+            } else {
+                return;
+            }
+        }
+        Tag tag2 = new Tag(INGTAG);
+        resultBuilder.append("\n").append(getYamlObject(tag2).dump(v1beta1Ingress).replace(INGTAG, "---"));
+    }
+
+    private void handleC7nHelmRelease(T t, String objectType, String operationType, StringBuilder resultBuilder, JSONObject jsonObject) {
+        Yaml yaml1 = new Yaml();
+        C7nHelmRelease c7nHelmRelease = yaml1.loadAs(jsonObject.toJSONString(), C7nHelmRelease.class);
+        if (objectType.equals("C7NHelmRelease") && c7nHelmRelease.getMetadata().getName().equals(((C7nHelmRelease) t).getMetadata().getName())) {
+            if (operationType.equals(UPDATE)) {
+                c7nHelmRelease = (C7nHelmRelease) t;
+            } else {
+                return;
+            }
+        }
+        Tag tag1 = new Tag(C7NTAG);
+        resultBuilder.append("\n").append(getYamlObject(tag1).dump(c7nHelmRelease).replace(C7NTAG, "---"));
+    }
+
+
+    private void handleC7nCertification(T t, String objectType, String operationType, StringBuilder resultBuilder, JSONObject jsonObject) {
+        Yaml yaml4 = new Yaml();
+        C7nCertification c7nCertification = yaml4.loadAs(jsonObject.toJSONString(), C7nCertification.class);
+        if (objectType.equals("C7nCertification") && c7nCertification.getMetadata().getName().equals(((C7nCertification) t).getMetadata().getName())) {
+            if (operationType.equals(UPDATE)) {
+                c7nCertification = (C7nCertification) t;
+            } else {
+                return;
+            }
+        }
+        Tag tag1 = new Tag(CERTTAG);
+        resultBuilder.append("\n").append(getYamlObject(tag1).dump(c7nCertification).replace(CERTTAG, "---"));
+    }
 }

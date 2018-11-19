@@ -7,7 +7,6 @@ import io.choerodon.devops.api.dto.DevopsIngressDTO;
 import io.choerodon.devops.domain.application.entity.DevopsIngressE;
 import io.choerodon.devops.domain.application.entity.DevopsIngressPathE;
 import io.choerodon.devops.infra.dataobject.DevopsIngressDO;
-import io.choerodon.devops.infra.dataobject.DevopsIngressPathDO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 /**
@@ -17,9 +16,9 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
  * Description:
  */
 public interface DevopsIngressRepository {
-    void createIngress(DevopsIngressDO devopsIngressDO, List<DevopsIngressPathDO> devopsIngressPathDOList);
+    DevopsIngressDO createIngress(DevopsIngressDO devopsIngressDO);
 
-    void updateIngress(DevopsIngressDO devopsIngressDO, List<DevopsIngressPathDO> devopsIngressPathDOList);
+    void updateIngressAndIngressPath(DevopsIngressDO devopsIngressDO);
 
     void updateIngress(DevopsIngressDO devopsIngressDO);
 

@@ -51,6 +51,8 @@ public class FileUtil {
     private static final int BUFFER_SIZE = 2048;
     private static final Logger logger = LoggerFactory.getLogger(FileUtil.class);
     private static final String EXEC_PATH = "/usr/lib/yaml/values_yaml";
+
+
     private FileUtil() {
     }
 
@@ -325,8 +327,12 @@ public class FileUtil {
 
     public static List<String> getFilesPath(String filepath) {
         File file = new File(filepath);
-        return getFilesPath(file).parallelStream()
-                .map(t -> t.replaceFirst(filepath+"/", "")).collect(Collectors.toList());
+        List<String> filepaths = getFilesPath(file);
+        if (!filepaths.isEmpty()) {
+            return filepaths.parallelStream()
+                    .map(t -> t.replaceFirst(filepath + "/", "")).collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 
     /**
@@ -443,7 +449,7 @@ public class FileUtil {
                     stdInput.close();
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.info(e.getMessage(), e);
             }
         }
         return replaceResult;
@@ -468,7 +474,9 @@ public class FileUtil {
         for (Object add : addLists) {
             ArrayList<String> addList = (ArrayList<String>) add;
             Node node = getKeysNode(addList, mappingNode);
-            appendLine(node.getStartMark().getLine(), node.getEndMark().getLine(), addLines);
+            if (node != null) {
+                appendLine(node.getStartMark().getLine(), node.getEndMark().getLine(), addLines);
+            }
         }
 
         List<HighlightMarker> highlightMarkers = new ArrayList<>();
@@ -479,11 +487,13 @@ public class FileUtil {
             ArrayList<String> addList = (ArrayList<String>) add;
             Node node = getKeysNode(addList, mappingNode);
             HighlightMarker highlightMarker = new HighlightMarker();
-            highlightMarker.setLine(node.getStartMark().getLine());
-            highlightMarker.setEndLine(node.getEndMark().getLine());
-            highlightMarker.setStartColumn(node.getStartMark().getColumn());
-            highlightMarker.setEndColumn(node.getEndMark().getColumn());
-            highlightMarkers.add(highlightMarker);
+            if (node != null) {
+                highlightMarker.setLine(node.getStartMark().getLine());
+                highlightMarker.setEndLine(node.getEndMark().getLine());
+                highlightMarker.setStartColumn(node.getStartMark().getColumn());
+                highlightMarker.setEndColumn(node.getEndMark().getColumn());
+                highlightMarkers.add(highlightMarker);
+            }
         }
 
         ReplaceResult replaceResult = new ReplaceResult();
@@ -872,6 +882,9 @@ public class FileUtil {
      */
     public static String jungeValueFormat(String value) {
         try {
+            if (value.equals("")) {
+                return "{}";
+            }
             JSONObject.parseObject(value);
             value = FileUtil.jsonToYaml(value);
             return value;
@@ -890,7 +903,7 @@ public class FileUtil {
             Composer composer = new Composer(new ParserImpl(new StreamReader(yaml)), new Resolver());
             composer.getSingleNode();
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
     }
 
@@ -1139,18 +1152,8 @@ public class FileUtil {
                                  boolean keepDirStructure) {
         byte[] buf = new byte[BUFFER_SIZE];
         if (sourceFile.isFile()) {
-            // copy文件到zip输出流中
-            int len;
-            try (FileInputStream in = new FileInputStream(sourceFile)) {
-                // 向zip输出流中添加一个zip实体，构造器中name为zip实体的文件的名字
-                zos.putNextEntry(new ZipEntry(name));
-                while ((len = in.read(buf)) != -1) {
-                    zos.write(buf, 0, len);
-                }
-                zos.closeEntry();
-            } catch (IOException e) {
-                throw new CommonException(e.getMessage());
-            }
+            isFile(sourceFile, zos, name, buf);
+
         } else {
             File[] listFiles = sourceFile.listFiles();
             if (listFiles == null || listFiles.length == 0) {
@@ -1176,6 +1179,21 @@ public class FileUtil {
                                         : file.getName(), keepDirStructure)
                 );
             }
+        }
+    }
+
+    private static void isFile(File sourceFile, ZipOutputStream zos, String name, byte[] buf) {
+        // copy文件到zip输出流中
+        int len;
+        try (FileInputStream in = new FileInputStream(sourceFile)) {
+            // 向zip输出流中添加一个zip实体，构造器中name为zip实体的文件的名字
+            zos.putNextEntry(new ZipEntry(name));
+            while ((len = in.read(buf)) != -1) {
+                zos.write(buf, 0, len);
+            }
+            zos.closeEntry();
+        } catch (IOException e) {
+            throw new CommonException(e.getMessage());
         }
     }
 
@@ -1354,10 +1372,8 @@ public class FileUtil {
         int type = KeyPair.RSA;
         String strPath = "id_rsa";
         JSch jsch = new JSch();
-        String passphrase = "";
         try {
             KeyPair kpair = KeyPair.genKeyPair(jsch, type);
-            kpair.setPassphrase(passphrase);
             kpair.writePrivateKey(strPath);
             kpair.writePublicKey(strPath + ".pub", path);
             kpair.dispose();
@@ -1371,4 +1387,5 @@ public class FileUtil {
         }
         return sshkeys;
     }
+
 }

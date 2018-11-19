@@ -11,12 +11,13 @@ import org.springframework.stereotype.Component;
 
 import io.choerodon.asgard.saga.SagaDefinition;
 import io.choerodon.asgard.saga.annotation.SagaTask;
+import io.choerodon.devops.api.dto.PipelineWebHookDTO;
 import io.choerodon.devops.api.dto.PushWebHookDTO;
-import io.choerodon.devops.app.service.ApplicationService;
-import io.choerodon.devops.app.service.ApplicationTemplateService;
-import io.choerodon.devops.app.service.DevopsEnvironmentService;
-import io.choerodon.devops.app.service.DevopsGitService;
+import io.choerodon.devops.app.service.*;
+import io.choerodon.devops.domain.application.entity.ApplicationE;
+import io.choerodon.devops.domain.application.event.DevOpsAppPayload;
 import io.choerodon.devops.domain.application.event.GitlabProjectPayload;
+import io.choerodon.devops.domain.application.repository.ApplicationRepository;
 
 /**
  * Creator: Runge
@@ -41,6 +42,10 @@ public class DevopsSagaHandler {
     private ApplicationTemplateService applicationTemplateService;
     @Autowired
     private ApplicationService applicationService;
+    @Autowired
+    private DevopsGitlabPipelineService devopsGitlabPipelineService;
+    @Autowired
+    private ApplicationRepository applicationRepository;
 
     /**
      * devops创建环境
@@ -48,6 +53,7 @@ public class DevopsSagaHandler {
     @SagaTask(code = "devopsCreateEnv",
             description = "devops创建环境",
             sagaCode = "devops-create-env",
+            maxRetryCount = 0,
             seq = 1)
     public String devopsCreateUser(String data) {
         GitlabProjectPayload gitlabProjectPayload = gson.fromJson(data, GitlabProjectPayload.class);
@@ -62,6 +68,7 @@ public class DevopsSagaHandler {
             description = "gitops",
             sagaCode = "devops-sync-gitops",
             concurrentLimitNum = 1,
+            maxRetryCount = 0,
             concurrentLimitPolicy = SagaDefinition.ConcurrentLimitPolicy.TYPE_AND_ID,
             seq = 1)
     public String gitops(String data) {
@@ -81,11 +88,39 @@ public class DevopsSagaHandler {
     @SagaTask(code = "devopsOperationGitlabProject",
             description = "devops create GitLab project",
             sagaCode = "devops-create-gitlab-project",
+            maxRetryCount = 1,
             seq = 1)
     public String createApp(String data) {
-        GitlabProjectPayload gitlabProjectEventDTO = gson.fromJson(data, GitlabProjectPayload.class);
-        if (gitlabProjectEventDTO.getType().equals(APPLICATION)) {
-            applicationService.operationApplication(gitlabProjectEventDTO);
+        DevOpsAppPayload devOpsAppPayload = gson.fromJson(data, DevOpsAppPayload.class);
+        if (devOpsAppPayload.getType().equals(APPLICATION)) {
+           try {
+               applicationService.operationApplication(devOpsAppPayload);
+           } catch (Exception e){
+               applicationService.setAppErrStatus(data);
+               throw e;
+           }
+           ApplicationE applicationE = applicationRepository.query(devOpsAppPayload.getAppId());
+           if (applicationE.getFailed() != null && applicationE.getFailed()) {
+               applicationE.setFailed(false);
+               if (1 != applicationRepository.update(applicationE)) {
+                   LOGGER.error("update application set create success status error");
+               }
+           }
+        }
+        return data;
+    }
+
+    @SagaTask(code = "devopsCreateGitlabProjectErr",
+            description = "set  DevOps app status error",
+            sagaCode = "devops-set-app-err",
+            maxRetryCount = 0,
+            seq = 1)
+    public String setAppErr(String data) {
+        DevOpsAppPayload devOpsAppPayload = gson.fromJson(data, DevOpsAppPayload.class);
+        ApplicationE applicationE = applicationRepository.query(devOpsAppPayload.getAppId());
+        applicationE.setFailed(true);
+        if (1 != applicationRepository.update(applicationE)) {
+            LOGGER.error("update application {} set create failed status error", applicationE.getCode());
         }
         return data;
     }
@@ -96,6 +131,7 @@ public class DevopsSagaHandler {
     @SagaTask(code = "devopsOperationGitlabTemplateProject",
             description = "devops create GitLab template project",
             sagaCode = "devops-create-gitlab-template-project",
+            maxRetryCount = 0,
             seq = 1)
     public String createTemplate(String data) {
         GitlabProjectPayload gitlabProjectEventDTO = gson.fromJson(data, GitlabProjectPayload.class);
@@ -105,4 +141,25 @@ public class DevopsSagaHandler {
         return data;
     }
 
+
+    /**
+     * GitOps 事件处理
+     */
+    @SagaTask(code = "devopsGitlabPipeline",
+            description = "gitlab-pipeline",
+            sagaCode = "devops-gitlab-pipeline",
+            concurrentLimitNum = 1,
+            maxRetryCount = 0,
+            concurrentLimitPolicy = SagaDefinition.ConcurrentLimitPolicy.TYPE_AND_ID,
+            seq = 1)
+    public String gitlabPipeline(String data) {
+        PipelineWebHookDTO pipelineWebHookDTO = null;
+        try {
+            pipelineWebHookDTO = objectMapper.readValue(data, PipelineWebHookDTO.class);
+        } catch (IOException e) {
+            LOGGER.info(e.getMessage());
+        }
+        devopsGitlabPipelineService.handleCreate(pipelineWebHookDTO);
+        return data;
+    }
 }

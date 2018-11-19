@@ -55,12 +55,17 @@ public class IamServiceClientFallback implements IamServiceClient {
     }
 
     @Override
-    public ResponseEntity<Page<ProjectDO>> queryProjectByOrgId(Long organizationId, int page, int size) {
+    public ResponseEntity<Page<ProjectDO>> queryProjectByOrgId(Long id, int page, int size, String name) {
         return new ResponseEntity("error.project.get", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @Override
     public ResponseEntity<List<UserDO>> listUsersByIds(Long[] ids) {
         return new ResponseEntity("error.user.get.byIds", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @Override
+    public ResponseEntity<Page<UserDO>> listUsersByEmail(Long projectId, int page, int size, String email) {
+        return new ResponseEntity("error.user.get.byEmail", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
