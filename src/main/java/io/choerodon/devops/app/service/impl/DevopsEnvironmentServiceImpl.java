@@ -159,6 +159,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
 
         GitlabGroupE gitlabGroupE = devopsProjectRepository.queryDevopsProject(projectId);
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
+
         GitlabProjectPayload gitlabProjectPayload = new GitlabProjectPayload();
         gitlabProjectPayload.setGroupId(gitlabGroupE.getEnvGroupId());
         gitlabProjectPayload.setUserId(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
@@ -182,7 +183,9 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
             EnvApplicationDomain domain = assembleEnvDomain("申请环境"
                     , organization
                     , projectE
-                    , userAttrE
+                    , GitUserNameUtil.getUsername()
+                    , GitUserNameUtil.getUserId().toString()
+                    , GitUserNameUtil.getRealUsername()
                     , devopsEnviromentDTO.getName()
                     , devopsEnviromentDTO.getDescription()
                     , devopsEnviromentDTO.getPartition()
@@ -198,7 +201,9 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     private EnvApplicationDomain assembleEnvDomain(String type,
                                                    Organization organization,
                                                    ProjectE projectE,
-                                                   UserAttrE userAttrE,
+                                                   String userId,
+                                                   String userRealname,
+                                                   String userName,
                                                    String envName,
                                                    String envDesc,
                                                    String partition,
@@ -220,9 +225,13 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                 projectE.getCode();
         domain.setProjectInfo(prjSb);
 
-        String usrSb = userAttrE.getId().toString();
-        domain.setUserInfo(usrSb);
+        String usrSb = userName +
+                "|" +
+                userId +
+                "|" +
+                userRealname;
 
+        domain.setUserInfo(usrSb);
         domain.setType(type);
 
         domain.setEnvName(envName);
@@ -379,7 +388,9 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
             domain = assembleEnvDomain("申请升级环境"
                     , organization
                     , projectE
-                    , userAttrE
+                    , GitUserNameUtil.getUsername()
+                    , GitUserNameUtil.getUserId().toString()
+                    , GitUserNameUtil.getRealUsername()
                     , devopsEnvironmentE.getName()
                     , devopsEnvironmentE.getDescription()
                     , extractPartition(devopsEnvironmentE.getCode())
@@ -390,7 +401,9 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
             domain = assembleEnvDomain("申请重启环境"
                     , organization
                     , projectE
-                    , userAttrE
+                    , GitUserNameUtil.getUsername()
+                    , GitUserNameUtil.getUserId().toString()
+                    , GitUserNameUtil.getRealUsername()
                     , devopsEnvironmentE.getName()
                     , devopsEnvironmentE.getDescription()
                     , extractPartition(devopsEnvironmentE.getCode())
