@@ -33,6 +33,9 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+            - containerPort: {{ .Values.debug.port }}
+              name: "jvm-debug"
+              protocol: TCP
           # readinessProbe:
           #   httpGet:
           #     path: /health
