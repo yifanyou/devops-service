@@ -7,6 +7,7 @@ import java.util.Map;
 
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -468,6 +469,17 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                     devopsServiceE.getId(), devopsServiceE.getName(), servicePort));
             v1beta1Ingress.getSpec().getRules().get(0).getHttp().addPathsItem(
                     createPath(hostPath, serviceId, servicePort));
+
+            /**
+             * rewrite
+             */
+            String rewritePath = t.getRewritePath();
+            if(!StringUtils.isEmpty(rewritePath)){
+                DevopsIngressValidator.checkPath(rewritePath);
+                Map<String, String> annotations = new HashMap<>();
+                annotations.put("nginx.ingress.kubernetes.io/rewrite-target", rewritePath);
+                v1beta1Ingress.getMetadata().setAnnotations(annotations);
+            }
         });
         return devopsIngressPathDOS;
     }
