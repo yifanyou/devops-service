@@ -1,8 +1,8 @@
 package io.choerodon.devops.api.controller.v1;
 
+import javax.validation.Valid;
 import java.util.List;
 import java.util.Optional;
-import javax.validation.Valid;
 
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -31,6 +31,7 @@ import io.choerodon.swagger.annotation.Permission;
 @RequestMapping(value = "/v1/projects/{project_id}/service")
 public class DevopsServiceController {
 
+    public static final String ERROR_APP_K8S_SERVICE_QUERY = "error.app.k8s.service.query";
     private DevopsServiceService devopsServiceService;
 
     public DevopsServiceController(DevopsServiceService devopsServiceService) {
@@ -75,7 +76,7 @@ public class DevopsServiceController {
                                           @ApiParam(value = "部署网络参数", required = true)
                                           @RequestBody @Valid DevopsServiceReqDTO devopsServiceReqDTO) {
         return Optional.ofNullable(
-                devopsServiceService.insertDevopsService(projectId, devopsServiceReqDTO, false))
+                devopsServiceService.insertDevopsService(projectId, devopsServiceReqDTO))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.CREATED))
                 .orElseThrow(() -> new CommonException("error.service.deploy"));
     }
@@ -98,7 +99,7 @@ public class DevopsServiceController {
                                           @ApiParam(value = "部署网络参数", required = true)
                                           @RequestBody DevopsServiceReqDTO devopsServiceReqDTO) {
         return Optional.ofNullable(
-                devopsServiceService.updateDevopsService(projectId, id, devopsServiceReqDTO, false))
+                devopsServiceService.updateDevopsService(projectId, id, devopsServiceReqDTO))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.CREATED))
                 .orElseThrow(() -> new CommonException("error.app.k8s.service.update"));
     }
@@ -117,7 +118,7 @@ public class DevopsServiceController {
                                  @PathVariable(value = "project_id") Long projectId,
                                  @ApiParam(value = "网络ID", required = true)
                                  @PathVariable Long id) {
-        devopsServiceService.deleteDevopsService(id, false);
+        devopsServiceService.deleteDevopsService(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
@@ -146,7 +147,7 @@ public class DevopsServiceController {
             @RequestBody(required = false) String searchParam) {
         return Optional.ofNullable(devopsServiceService.listDevopsServiceByPage(projectId, pageRequest, searchParam))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
-                .orElseThrow(() -> new CommonException("error.app.k8s.service.query"));
+                .orElseThrow(() -> new CommonException(ERROR_APP_K8S_SERVICE_QUERY));
     }
 
     /**
@@ -189,7 +190,7 @@ public class DevopsServiceController {
             @PathVariable Long id) {
         return Optional.ofNullable(devopsServiceService.query(id))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
-                .orElseThrow(() -> new CommonException("error.app.k8s.service.query"));
+                .orElseThrow(() -> new CommonException(ERROR_APP_K8S_SERVICE_QUERY));
     }
 
 
@@ -215,11 +216,12 @@ public class DevopsServiceController {
             @ApiParam(value = "环境id", required = true)
             @PathVariable(value = "envId") Long envId,
             @ApiParam(value = "分页参数")
+            @SortDefault(value = "id", direction = Sort.Direction.DESC)
             @ApiIgnore PageRequest pageRequest,
             @ApiParam(value = "查询参数")
             @RequestBody(required = false) String searchParam) {
         return Optional.ofNullable(devopsServiceService.listByEnv(projectId, envId, pageRequest, searchParam))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
-                .orElseThrow(() -> new CommonException("error.app.k8s.service.query"));
+                .orElseThrow(() -> new CommonException(ERROR_APP_K8S_SERVICE_QUERY));
     }
 }

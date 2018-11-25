@@ -44,7 +44,11 @@ public enum HelmType {
     RESOURCE_SYNC("resource_sync"),
     JOB_EVENT("job_event"),
     RELEASE_POD_EVENT("release_pod_event"),
-    GIT_OPS_SYNC_EVENT("git_ops_sync_event");
+    GIT_OPS_SYNC_EVENT("git_ops_sync_event"),
+    STATUS_SYNC_EVENT("status_sync_event"),
+    STATUS_SYNC("status_sync"),
+    CERT_ISSUED("cert_issued"),
+    CERT_FAILED("cert_failed");
 
     private static HashMap<String, HelmType> valuesMap = new HashMap<>(6);
 
@@ -147,6 +151,14 @@ public enum HelmType {
                 return HelmType.RELEASE_POD_EVENT;
             case "git_ops_sync_event":
                 return HelmType.GIT_OPS_SYNC_EVENT;
+            case "cert_issued":
+                return CERT_ISSUED;
+            case "cert_failed":
+                return CERT_FAILED;
+            case "status_sync":
+                return HelmType.STATUS_SYNC;
+            case "status_sync_event":
+                return HelmType.STATUS_SYNC_EVENT;
             default:
                 break;
         }

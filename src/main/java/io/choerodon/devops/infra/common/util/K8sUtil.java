@@ -1,18 +1,16 @@
 package io.choerodon.devops.infra.common.util;
 
-import io.choerodon.devops.app.service.impl.DevopsGitServiceImpl;
-import io.kubernetes.client.models.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import io.kubernetes.client.models.*;
 
 /**
  * Created by younger on 2018/4/25.
  */
 public class K8sUtil {
+
     private static final String INIT = "Init:";
     private static final String SIGNAL = "Signal:";
     private static final String EXIT_CODE = "ExitCode:";
@@ -205,8 +203,10 @@ public class K8sUtil {
             if (results.size() == max) {
                 more = true;
             }
-            if (!more && v1beta1IngressRule.getHost().length() != 0) {
-                results.add(v1beta1IngressRule.getHost());
+            if (v1beta1IngressRule.getHost() != null) {
+                if (!more && v1beta1IngressRule.getHost().length() != 0) {
+                    results.add(v1beta1IngressRule.getHost());
+                }
             }
         }
         if (results.isEmpty()) {

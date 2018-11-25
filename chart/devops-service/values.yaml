@@ -10,6 +10,8 @@ image:
 
 preJob:
   preConfig:
+    enable: true
+    timeout: 300
     configFile: application.yml
     mysql:
       host: 192.168.12.175
@@ -18,6 +20,8 @@ preJob:
       username: root
       password: choerodon
   preInitDB:
+    enable: true
+    timeout: 300
     mysql:
       host: 192.168.12.175
       port: 3306
@@ -55,6 +59,7 @@ env:
     SECURITY_IGNORED: /ci,/webhook,/v2/api-docs,/agent/**,/ws/**,/webhook/**
     AGENT_SERVICEURL: ws://devops-service.choerodon.com.cn/agent/
     AGENT_REPOURL: https://openchart.choerodon.com.cn/choerodon/c7n/
+    CERT_TESTCERT: false
     TEMPLATE_VERSION_MICROSERVICE: 0.9.0
     TEMPLATE_VERSION_MICROSERVICEFRONT: 0.9.0
     TEMPLATE_VERSION_JAVALIB: 0.9.0
@@ -80,6 +85,10 @@ service:
   enable: false
   type: ClusterIP
   port: 8060
+
+debug:
+  enable: false
+  port: 5005
 
 resources: 
   # We usually recommend not to specify default resources and to leave this as a conscious

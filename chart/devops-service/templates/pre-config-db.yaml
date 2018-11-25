@@ -1,3 +1,4 @@
+{{- if .Values.preJob.preInitDB.enable }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,7 +10,7 @@ metadata:
     "helm.sh/hook-weight": "1"
 spec:
   backoffLimit: 1
-  activeDeadlineSeconds: 2400
+  activeDeadlineSeconds: {{ .Values.preJob.timeout | default 300 }}
   template:
     metadata:
       name: {{ .Release.Name }}-init-db
@@ -37,7 +38,10 @@ spec:
         volumeMounts:
         - mountPath: /var/choerodon
           name: tools-jar
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
       restartPolicy: Never
       volumes:
       - emptyDir: {}
         name: tools-jar
+{{- end }}

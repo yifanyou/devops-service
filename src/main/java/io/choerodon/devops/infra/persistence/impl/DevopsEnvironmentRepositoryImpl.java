@@ -55,6 +55,9 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
                 devopsEnvironmentE.getId());
         DevopsEnvironmentDO devopsEnvironmentDO = ConvertHelper.convert(devopsEnvironmentE, DevopsEnvironmentDO.class);
         devopsEnvironmentDO.setObjectVersionNumber(newDevopsEnvironmentDO.getObjectVersionNumber());
+        if (devopsEnvironmentE.getDevopsEnvGroupId() == null) {
+            devopsEnvironmentMapper.updateDevopsEnvGroupId(devopsEnvironmentDO.getId());
+        }
         if (devopsEnvironmentMapper.updateByPrimaryKeySelective(devopsEnvironmentDO) != 1) {
             throw new CommonException("error.environment.update");
         }
@@ -118,5 +121,10 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
     @Override
     public List<DevopsEnvironmentE> list() {
         return ConvertHelper.convertList(devopsEnvironmentMapper.selectAll(), DevopsEnvironmentE.class);
+    }
+
+    @Override
+    public void updateEnvCommit(DevopsEnvironmentE devopsEnvironmentE) {
+        devopsEnvironmentMapper.updateDevopsEnvCommit(devopsEnvironmentE.getId(), devopsEnvironmentE.getGitCommit(), devopsEnvironmentE.getDevopsSyncCommit(), devopsEnvironmentE.getAgentSyncCommit());
     }
 }

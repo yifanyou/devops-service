@@ -6,6 +6,8 @@ import java.util.*;
 
 import com.google.gson.Gson;
 import org.eclipse.jgit.api.Git;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import io.choerodon.core.convertor.ConvertHelper;
 import io.choerodon.core.convertor.ConvertPageHelper;
 import io.choerodon.core.domain.Page;
 import io.choerodon.core.exception.CommonException;
+import io.choerodon.core.oauth.DetailsHelper;
 import io.choerodon.devops.api.dto.*;
 import io.choerodon.devops.api.validator.ApplicationValidator;
 import io.choerodon.devops.app.service.ApplicationService;
@@ -26,14 +29,15 @@ import io.choerodon.devops.domain.application.entity.gitlab.CommitE;
 import io.choerodon.devops.domain.application.entity.gitlab.GitlabGroupE;
 import io.choerodon.devops.domain.application.entity.gitlab.GitlabGroupMemberE;
 import io.choerodon.devops.domain.application.entity.gitlab.GitlabUserE;
-import io.choerodon.devops.domain.application.event.GitlabProjectPayload;
+import io.choerodon.devops.domain.application.event.DevOpsAppPayload;
 import io.choerodon.devops.domain.application.factory.ApplicationFactory;
 import io.choerodon.devops.domain.application.repository.*;
 import io.choerodon.devops.domain.application.valueobject.Organization;
 import io.choerodon.devops.domain.application.valueobject.ProjectHook;
+import io.choerodon.devops.domain.application.valueobject.Variable;
 import io.choerodon.devops.infra.common.util.*;
 import io.choerodon.devops.infra.common.util.enums.AccessLevel;
-import io.choerodon.devops.infra.config.CiYamlConfig;
+import io.choerodon.devops.infra.dataobject.gitlab.BranchDO;
 import io.choerodon.devops.infra.dataobject.gitlab.GitlabProjectDO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
@@ -43,9 +47,9 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 @Service
 public class ApplicationServiceImpl implements ApplicationService {
 
+    public static final Logger logger = LoggerFactory.getLogger(ApplicationServiceImpl.class);
     private static final String MASTER = "master";
     private static final String APPLICATION = "application";
-
     private Gson gson = new Gson();
 
     @Value("${services.gitlab.url}")
@@ -69,8 +73,6 @@ public class ApplicationServiceImpl implements ApplicationService {
     private DevopsProjectRepository devopsProjectRepository;
     @Autowired
     private GitUtil gitUtil;
-    @Autowired
-    private CiYamlConfig ciYamlConfig;
     @Autowired
     private GitlabUserRepository gitlabUserRepository;
     @Autowired
@@ -106,17 +108,19 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (groupMemberE == null || groupMemberE.getAccessLevel() != AccessLevel.OWNER.toValue()) {
             throw new CommonException("error.user.not.owner");
         }
-        GitlabProjectPayload gitlabProjectPayload = new GitlabProjectPayload();
-        gitlabProjectPayload.setType(APPLICATION);
-        gitlabProjectPayload.setPath(applicationDTO.getCode());
-        gitlabProjectPayload.setOrganizationId(organization.getId());
-        gitlabProjectPayload.setUserId(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
-        gitlabProjectPayload.setGroupId(gitlabGroupE.getGitlabGroupId());
-
-        if (applicationRepository.create(applicationE).getId() == null) {
+        // 创建sega payload
+        DevOpsAppPayload devOpsAppPayload = new DevOpsAppPayload();
+        devOpsAppPayload.setType(APPLICATION);
+        devOpsAppPayload.setPath(applicationDTO.getCode());
+        devOpsAppPayload.setOrganizationId(organization.getId());
+        devOpsAppPayload.setUserId(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
+        devOpsAppPayload.setGroupId(gitlabGroupE.getGitlabGroupId());
+        applicationE = applicationRepository.create(applicationE);
+        if (applicationE.getId() == null) {
             throw new CommonException("error.application.create.insert");
         }
-        String input = gson.toJson(gitlabProjectPayload);
+        devOpsAppPayload.setAppId(applicationE.getId());
+        String input = gson.toJson(devOpsAppPayload);
         sagaClient.startSaga("devops-create-gitlab-project", new StartInstanceDTO(input, "", ""));
 
         return ConvertHelper.convert(applicationRepository.queryByCode(applicationE.getCode(),
@@ -133,6 +137,16 @@ public class ApplicationServiceImpl implements ApplicationService {
                 + organization.getCode() + "-" + projectE.getCode() + "/"
                 + applicationE.getCode() + ".git");
         return ConvertHelper.convert(applicationE, ApplicationRepDTO.class);
+    }
+
+    @Override
+    public void delete(Long projectId, Long applicationId) {
+        ProjectE projectE = iamRepository.queryIamProject(projectId);
+        Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
+        ApplicationE applicationE = applicationRepository.query(applicationId);
+        gitlabRepository.deleteDevOpsApp(organization.getCode() + "-" + projectE.getCode(),
+                applicationE.getCode(), DetailsHelper.getUserDetails().getUserId().intValue());
+        applicationRepository.delete(applicationId);
     }
 
     @Override
@@ -159,6 +173,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         return true;
     }
 
+
     @Override
     public Page<ApplicationRepDTO> listByOptions(Long projectId, Boolean isActive, Boolean hasVersion,
                                                  PageRequest pageRequest, String params) {
@@ -169,42 +184,59 @@ public class ApplicationServiceImpl implements ApplicationService {
         String urlSlash = gitlabUrl.endsWith("/") ? "" : "/";
         applicationES.getContent().parallelStream()
                 .forEach(t -> {
-                    if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
-                        t.initGitlabProjectEByUrl(gitlabUrl + urlSlash
-                                + organization.getCode() + "-" + projectE.getCode() + "/"
-                                + t.getCode() + ".git");
-                        if (!sonarqubeUrl.equals("")) {
-                            Integer result = 0;
-                            try {
-                                result = HttpClientUtil.getSonar(
-                                        sonarqubeUrl.endsWith("/")
-                                                ? sonarqubeUrl
-                                                : String.format(
-                                                "%s/api/project_links/search?projectKey=%s-%s:%s",
-                                                sonarqubeUrl,
-                                                organization.getCode(),
-                                                projectE.getCode(),
-                                                t.getCode()
-                                        ));
-                                if (result.equals(HttpStatus.OK.value())) {
-                                    t.initSonarUrl(sonarqubeUrl.endsWith("/") ? sonarqubeUrl : sonarqubeUrl + "/"
-                                            + "dashboard?id="
-                                            + organization.getCode() + "-" + projectE.getCode() + ":"
-                                            + t.getCode());
-                                }
-                            } catch (Exception e) {
-                                t.initSonarUrl(null);
+                            if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
+                                t.initGitlabProjectEByUrl(gitlabUrl + urlSlash
+                                        + organization.getCode() + "-" + projectE.getCode() + "/"
+                                        + t.getCode() + ".git");
+                                getSonarUrl(projectE, organization, t);
                             }
                         }
-                    }
-                });
+                );
+
         return ConvertPageHelper.convertPage(applicationES, ApplicationRepDTO.class);
+    }
+
+    private void getSonarUrl(ProjectE projectE, Organization organization, ApplicationE t) {
+        if (!sonarqubeUrl.equals("")) {
+            Integer result;
+            try {
+                result = HttpClientUtil.getSonar(
+                        sonarqubeUrl.endsWith("/")
+                                ? sonarqubeUrl
+                                : String.format(
+                                "%s/api/project_links/search?projectKey=%s-%s:%s",
+                                sonarqubeUrl,
+                                organization.getCode(),
+                                projectE.getCode(),
+                                t.getCode()
+                        ));
+                if (result.equals(HttpStatus.OK.value())) {
+                    t.initSonarUrl(sonarqubeUrl.endsWith("/") ? sonarqubeUrl : sonarqubeUrl + "/"
+                            + "dashboard?id="
+                            + organization.getCode() + "-" + projectE.getCode() + ":"
+                            + t.getCode());
+                }
+            } catch (Exception e) {
+                t.initSonarUrl(null);
+            }
+        }
     }
 
     @Override
     public Page<ApplicationRepDTO> listCodeRepository(Long projectId, PageRequest pageRequest, String params) {
         Page<ApplicationE> applicationES = applicationRepository.listCodeRepository(projectId, pageRequest, params);
-        applicationES.forEach(t -> t.initGitlabProjectEByUrl(devopsGitRepository.getGitlabUrl(projectId, t.getId())));
+        ProjectE projectE = iamRepository.queryIamProject(projectId);
+        Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
+        String urlSlash = gitlabUrl.endsWith("/") ? "" : "/";
+        applicationES.forEach(t -> {
+                    if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
+                        t.initGitlabProjectEByUrl(gitlabUrl + urlSlash
+                                + organization.getCode() + "-" + projectE.getCode() + "/"
+                                + t.getCode() + ".git");
+                        getSonarUrl(projectE, organization, t);
+                    }
+                }
+        );
         return ConvertPageHelper.convertPage(applicationES, ApplicationRepDTO.class);
     }
 
@@ -242,18 +274,21 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     @Override
-    public void operationApplication(GitlabProjectPayload gitlabProjectPayload) {
-        GitlabProjectDO gitlabProjectDO = gitlabRepository.createProject(gitlabProjectPayload.getGroupId(),
-                gitlabProjectPayload.getPath(),
-                gitlabProjectPayload.getUserId(), false);
-        gitlabProjectPayload.setGitlabProjectId(gitlabProjectDO.getId());
-
+    public void operationApplication(DevOpsAppPayload gitlabProjectPayload) {
         GitlabGroupE gitlabGroupE = devopsProjectRepository.queryByGitlabGroupId(
                 TypeUtil.objToInteger(gitlabProjectPayload.getGroupId()));
         ApplicationE applicationE = applicationRepository.queryByCode(gitlabProjectPayload.getPath(),
                 gitlabGroupE.getProjectE().getId());
         ProjectE projectE = iamRepository.queryIamProject(gitlabGroupE.getProjectE().getId());
         Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
+        GitlabProjectDO gitlabProjectDO = gitlabRepository.getProjectByName(organization.getCode() + "-" + projectE.getCode(), applicationE.getCode(), gitlabProjectPayload.getUserId());
+        if (gitlabProjectDO.getId() == null) {
+            gitlabProjectDO = gitlabRepository.createProject(gitlabProjectPayload.getGroupId(),
+                    gitlabProjectPayload.getPath(),
+                    gitlabProjectPayload.getUserId(), false);
+        }
+        gitlabProjectPayload.setGitlabProjectId(gitlabProjectDO.getId());
+
         if (applicationE.getApplicationTemplateE() != null) {
             ApplicationTemplateE applicationTemplateE = applicationTemplateRepository.query(
                     applicationE.getApplicationTemplateE().getId());
@@ -261,74 +296,47 @@ public class ApplicationServiceImpl implements ApplicationService {
             //拉取模板
             String repoUrl = applicationTemplateE.getRepoUrl();
             String type = applicationTemplateE.getCode();
-            boolean teamplateType = true;
             if (applicationTemplateE.getOrganization().getId() != null) {
-                repoUrl = repoUrl.startsWith("/") ? repoUrl.substring(1, repoUrl.length()) : repoUrl;
+                repoUrl = repoUrl.startsWith("/") ? repoUrl.substring(1) : repoUrl;
                 repoUrl = !gitlabUrl.endsWith("/") ? gitlabUrl + "/" + repoUrl : gitlabUrl + repoUrl;
                 type = MASTER;
-                teamplateType = false;
             }
             Git git = gitUtil.clone(applicationDir, type,
                     repoUrl);
             //渲染模板里面的参数
-            try {
-                File file = new File(gitUtil.getWorkingDirectory(applicationDir));
-                Map<String, String> params = new HashMap<>();
-                params.put("{{group.name}}", organization.getCode() + "-" + projectE.getCode());
-                params.put("{{org.code}}", organization.getCode());
-                params.put("{{project.code}}", projectE.getCode());
-                params.put("{{service.code}}", applicationE.getCode());
-                FileUtil.replaceReturnFile(file, params);
-            } catch (Exception e) {
-                //删除模板
-                gitUtil.deleteWorkingDirectory(applicationDir);
-                throw new CommonException(e.getMessage());
-            }
+            replaceParams(applicationE, projectE, organization, applicationDir);
 
-            List<String> tokens = gitlabRepository.listTokenByUserId(gitlabProjectPayload.getGitlabProjectId(),
-                    applicationDir, gitlabProjectPayload.getUserId());
-            String accessToken = "";
-            if (tokens.isEmpty()) {
-                accessToken = gitlabRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
-                        applicationDir, gitlabProjectPayload.getUserId());
-            } else {
-                accessToken = tokens.get(tokens.size() - 1);
-            }
+            String accessToken = getToken(gitlabProjectPayload, applicationDir);
+
             repoUrl = !gitlabUrl.endsWith("/") ? gitlabUrl + "/" : gitlabUrl;
             applicationE.initGitlabProjectEByUrl(repoUrl
                     + organization.getCode() + "-" + projectE.getCode() + "/"
                     + applicationE.getCode() + ".git");
             GitlabUserE gitlabUserE = gitlabUserRepository.getGitlabUserByUserId(gitlabProjectPayload.getUserId());
-            gitUtil.push(git, applicationDir, applicationE.getGitlabProjectE().getRepoURL(),
-                    gitlabUserE.getUsername(), accessToken, teamplateType);
-            gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
-                    AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
-            CommitE commitE;
-            try {
-                commitE = devopsGitRepository.getCommit(
-                        gitlabProjectPayload.getGitlabProjectId(), MASTER, gitlabProjectPayload.getUserId());
-            } catch (Exception e) {
-                commitE = new CommitE();
+
+            BranchDO branchDO = devopsGitRepository.getBranch(gitlabProjectDO.getId(), MASTER);
+            if (branchDO.getName() == null) {
+                gitUtil.push(git, applicationDir, applicationE.getGitlabProjectE().getRepoURL(),
+                        gitlabUserE.getUsername(), accessToken);
+                gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
+                        AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
+            } else {
+                if (branchDO.getProtected()) {
+                    gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
+                            AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
+                }
             }
-            DevopsBranchE devopsBranchE = new DevopsBranchE();
-            devopsBranchE.setUserId(TypeUtil.objToLong(gitlabProjectPayload.getUserId()));
-            devopsBranchE.setApplicationE(applicationE);
-            devopsBranchE.setBranchName(MASTER);
-            devopsBranchE.setCheckoutCommit(commitE.getId());
-            Date date = DateUtil.changeTimeZone(
-                    commitE.getCommittedDate(), TimeZone.getTimeZone("GMT"), TimeZone.getDefault());
-            devopsBranchE.setCheckoutDate(date);
-            devopsBranchE.setLastCommitUser(TypeUtil.objToLong(gitlabProjectPayload.getUserId()));
-            devopsBranchE.setLastCommitMsg(commitE.getMessage());
-            devopsBranchE.setLastCommitDate(date);
-            devopsBranchE.setLastCommit(commitE.getId());
-            devopsGitRepository.createDevopsBranch(devopsBranchE);
+
+            initMasterBranch(gitlabProjectPayload, applicationE);
         }
         try {
             String token = GenerateUUID.generateUUID();
-            gitlabRepository.addVariable(gitlabProjectPayload.getGitlabProjectId(), "Token",
-                    token,
-                    false, gitlabProjectPayload.getUserId());
+            List<Variable> variables = gitlabRepository.getVariable(gitlabProjectDO.getId(), gitlabProjectPayload.getUserId());
+            if (variables.isEmpty()) {
+                gitlabRepository.addVariable(gitlabProjectPayload.getGitlabProjectId(), "Token",
+                        token,
+                        false, gitlabProjectPayload.getUserId());
+            }
             applicationE.setToken(token);
             applicationE.initGitlabProjectE(
                     TypeUtil.objToInteger(gitlabProjectPayload.getGitlabProjectId()));
@@ -340,15 +348,75 @@ public class ApplicationServiceImpl implements ApplicationService {
             String uri = !gatewayUrl.endsWith("/") ? gatewayUrl + "/" : gatewayUrl;
             uri += "devops/webhook";
             projectHook.setUrl(uri);
-            applicationE.initHookId(TypeUtil.objToLong(gitlabRepository.createWebHook(
-                    gitlabProjectPayload.getGitlabProjectId(), gitlabProjectPayload.getUserId(), projectHook)
-                    .getId()));
+            List<ProjectHook> projectHooks = gitlabRepository.getHooks(gitlabProjectDO.getId(), gitlabProjectPayload.getUserId());
+            if (projectHooks == null) {
+                applicationE.initHookId(TypeUtil.objToLong(gitlabRepository.createWebHook(
+                        gitlabProjectPayload.getGitlabProjectId(), gitlabProjectPayload.getUserId(), projectHook)
+                        .getId()));
+            }
             if (applicationRepository.update(applicationE) != 1) {
                 throw new CommonException("error.application.update");
             }
         } catch (Exception e) {
+            throw new CommonException(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Saga(code = "devops-set-app-err",
+            description = "devops set app status create err", inputSchema = "{}")
+    public void setAppErrStatus(String input) {
+        sagaClient.startSaga("devops-set-app-err", new StartInstanceDTO(input, "", ""));
+    }
+
+    private void initMasterBranch(DevOpsAppPayload gitlabProjectPayload, ApplicationE applicationE) {
+        CommitE commitE;
+        try {
+            commitE = devopsGitRepository.getCommit(
+                    gitlabProjectPayload.getGitlabProjectId(), MASTER, gitlabProjectPayload.getUserId());
+        } catch (Exception e) {
+            commitE = new CommitE();
+        }
+        DevopsBranchE devopsBranchE = new DevopsBranchE();
+        devopsBranchE.setUserId(TypeUtil.objToLong(gitlabProjectPayload.getUserId()));
+        devopsBranchE.setApplicationE(applicationE);
+        devopsBranchE.setBranchName(MASTER);
+        devopsBranchE.setCheckoutCommit(commitE.getId());
+        Date date = DateUtil.changeTimeZone(
+                commitE.getCommittedDate(), TimeZone.getTimeZone("GMT"), TimeZone.getDefault());
+        devopsBranchE.setCheckoutDate(date);
+        devopsBranchE.setLastCommitUser(TypeUtil.objToLong(gitlabProjectPayload.getUserId()));
+        devopsBranchE.setLastCommitMsg(commitE.getMessage());
+        devopsBranchE.setLastCommitDate(date);
+        devopsBranchE.setLastCommit(commitE.getId());
+        devopsGitRepository.createDevopsBranch(devopsBranchE);
+    }
+
+    private void replaceParams(ApplicationE applicationE, ProjectE projectE, Organization organization, String applicationDir) {
+        try {
+            File file = new File(gitUtil.getWorkingDirectory(applicationDir));
+            Map<String, String> params = new HashMap<>();
+            params.put("{{group.name}}", organization.getCode() + "-" + projectE.getCode());
+            params.put("{{service.code}}", applicationE.getCode());
+            FileUtil.replaceReturnFile(file, params);
+        } catch (Exception e) {
+            //删除模板
+            gitUtil.deleteWorkingDirectory(applicationDir);
             throw new CommonException(e.getMessage());
         }
+    }
+
+    private String getToken(DevOpsAppPayload gitlabProjectPayload, String applicationDir) {
+        List<String> tokens = gitlabRepository.listTokenByUserId(gitlabProjectPayload.getGitlabProjectId(),
+                applicationDir, gitlabProjectPayload.getUserId());
+        String accessToken;
+        if (tokens.isEmpty()) {
+            accessToken = gitlabRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
+                    applicationDir, gitlabProjectPayload.getUserId());
+        } else {
+            accessToken = tokens.get(tokens.size() - 1);
+        }
+        return accessToken;
     }
 
     @Override
@@ -396,4 +464,8 @@ public class ApplicationServiceImpl implements ApplicationService {
                 ApplicationDTO.class);
     }
 
+    @Override
+    public void initMockService(SagaClient sagaClient) {
+        this.sagaClient = sagaClient;
+    }
 }

@@ -54,10 +54,12 @@ public class ApplicationVersionController {
             @PathVariable(value = "project_id") Long projectId,
             @ApiParam(value = "分页参数")
             @ApiIgnore PageRequest pageRequest,
+            @ApiParam(value = "应用Id")
+            @RequestParam(required = false) Long appId,
             @ApiParam(value = "查询参数")
             @RequestBody(required = false) String searchParam) {
-        return Optional.ofNullable(applicationVersionService.listApplicationVersion(
-                projectId, pageRequest, searchParam))
+        return Optional.ofNullable(applicationVersionService.listApplicationVersionInApp(
+                projectId, appId, pageRequest, searchParam))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException(VERSION_QUERY_ERROR));
     }
@@ -98,7 +100,7 @@ public class ApplicationVersionController {
     @ApiOperation(value = "项目下查询应用所有已部署版本")
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER})
+                    InitRoleCode.PROJECT_MEMBER, InitRoleCode.DEPLOY_ADMINISTRATOR})
     @GetMapping("/apps/{app_id}/version/list_deployed")
     public ResponseEntity<List<ApplicationVersionRepDTO>> queryDeployedByAppId(
             @ApiParam(value = "项目ID", required = true)

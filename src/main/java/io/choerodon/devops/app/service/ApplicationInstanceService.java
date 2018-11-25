@@ -1,11 +1,10 @@
 package io.choerodon.devops.app.service;
 
+import java.util.Date;
 import java.util.List;
 
 import io.choerodon.core.domain.Page;
 import io.choerodon.devops.api.dto.*;
-import io.choerodon.devops.domain.application.entity.DevopsEnvironmentE;
-import io.choerodon.devops.domain.application.entity.UserAttrE;
 import io.choerodon.devops.domain.application.valueobject.ReplaceResult;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
@@ -35,7 +34,7 @@ public interface ApplicationInstanceService {
      * @param appId     应用id
      * @return page of ApplicationInstancesDTO
      */
-    List<ApplicationInstancesDTO> listApplicationInstances(Long projectId, Long appId);
+    List<ApplicationInstancesDTO> listApplicationInstances(Long projectId, Long appId, Long envGroupId);
 
     /**
      * 查询value列表
@@ -53,7 +52,16 @@ public interface ApplicationInstanceService {
      * @param applicationDeployDTO 部署信息
      * @return ApplicationInstanceDTO
      */
-    ApplicationInstanceDTO create(ApplicationDeployDTO applicationDeployDTO, boolean gitops);
+    ApplicationInstanceDTO createOrUpdate(ApplicationDeployDTO applicationDeployDTO);
+
+    /**
+     * 部署应用,GitOps
+     *
+     * @param applicationDeployDTO 部署信息
+     * @return ApplicationInstanceDTO
+     */
+    ApplicationInstanceDTO createOrUpdateByGitOps(ApplicationDeployDTO applicationDeployDTO, Long userId);
+
 
     /**
      * 获取版本特性
@@ -93,7 +101,16 @@ public interface ApplicationInstanceService {
      *
      * @param instanceId 实例id
      */
-    void instanceDelete(Long instanceId, boolean gitops);
+    void instanceDelete(Long instanceId);
+
+
+    /**
+     * 实例删除
+     *
+     * @param instanceId 实例id
+     */
+    void instanceDeleteByGitOps(Long instanceId);
+
 
     /**
      * 获取部署 Value
@@ -137,11 +154,17 @@ public interface ApplicationInstanceService {
 
     Page<DevopsEnvFileDTO> getEnvFile(Long projectId, Long envId, PageRequest pageRequest);
 
-    String handDevopsEnvGitRepository(DevopsEnvironmentE devopsEnvironmentE);
-
-    void checkEnvProject(DevopsEnvironmentE devopsEnvironmentE, UserAttrE userAttrE);
 
     ReplaceResult getReplaceResult(String versionValue, String deployValue);
 
     ReplaceResult queryUpgradeValue(Long instanceId, Long versionId);
+
+
+    DeployTimeDTO listDeployTime(Long projectId, Long envId, Long[] appIds, Date startTime, Date endTime);
+
+    DeployFrequencyDTO listDeployFrequency(Long projectId, Long[] envIds, Long appId, Date startTime, Date endTime);
+
+    Page<DeployDetailDTO> pageDeployFrequencyDetail(Long projectId, PageRequest pageRequest, Long[] envIds, Long appId, Date startTime, Date endTime);
+
+    Page<DeployDetailDTO> pageDeployTimeDetail(Long projectId, PageRequest pageRequest, Long[] appIds, Long envId, Date startTime, Date endTime);
 }

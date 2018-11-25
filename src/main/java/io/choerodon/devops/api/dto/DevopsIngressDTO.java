@@ -20,7 +20,13 @@ public class DevopsIngressDTO {
     private Boolean envStatus;
     private Boolean isUsable;
     private String status;
+    private Long certId;
+    private String certName;
+    private String certStatus;
     private List<DevopsIngressPathDTO> pathList;
+    private String commandType;
+    private String commandStatus;
+    private String error;
 
     public DevopsIngressDTO() {
     }
@@ -120,6 +126,54 @@ public class DevopsIngressDTO {
         this.status = status;
     }
 
+    public Long getCertId() {
+        return certId;
+    }
+
+    public void setCertId(Long certId) {
+        this.certId = certId;
+    }
+
+    public String getCertName() {
+        return certName;
+    }
+
+    public void setCertName(String certName) {
+        this.certName = certName;
+    }
+
+    public String getCertStatus() {
+        return certStatus;
+    }
+
+    public void setCertStatus(String certStatus) {
+        this.certStatus = certStatus;
+    }
+
+    public String getCommandType() {
+        return commandType;
+    }
+
+    public void setCommandType(String commandType) {
+        this.commandType = commandType;
+    }
+
+    public String getCommandStatus() {
+        return commandStatus;
+    }
+
+    public void setCommandStatus(String commandStatus) {
+        this.commandStatus = commandStatus;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -132,7 +186,8 @@ public class DevopsIngressDTO {
         return Objects.equals(domain, that.domain)
                 && Objects.equals(name, that.name)
                 && Objects.equals(envId, that.envId)
-                && Objects.equals(pathList, that.pathList);
+                && Objects.equals(pathList, that.pathList)
+                && Objects.equals(certId, that.certId);
     }
 
     @Override

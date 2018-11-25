@@ -69,6 +69,7 @@ public class DevopsGitController {
      * @param applicationId 应用ID
      * @param tag           标签名称
      * @param ref           参考名称
+     * @param releaseNotes  发布日志
      * @return null
      */
     @Permission(level = ResourceLevel.PROJECT,
@@ -83,8 +84,39 @@ public class DevopsGitController {
             @ApiParam(value = "标签名称", required = true)
             @RequestParam String tag,
             @ApiParam(value = "参考名称", required = true)
-            @RequestParam String ref) {
-        devopsGitService.createTag(projectId, applicationId, tag, ref);
+            @RequestParam String ref,
+            @ApiParam(value = "标签描述")
+            @RequestParam(value = "message", required = false, defaultValue = "") String msg,
+            @ApiParam(value = "发布日志")
+            @RequestBody(required = false) String releaseNotes) {
+        devopsGitService.createTag(projectId, applicationId, tag, ref, msg, releaseNotes);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+
+    /**
+     * 更新标签
+     *
+     * @param projectId     项目ID
+     * @param applicationId 应用ID
+     * @param tag           标签名称
+     * @param releaseNotes  发布日志
+     * @return null
+     */
+    @Permission(level = ResourceLevel.PROJECT,
+            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
+    @ApiOperation(value = "更新标签")
+    @PutMapping("/tags")
+    public ResponseEntity updateTagRelease(
+            @ApiParam(value = "项目id", required = true)
+            @PathVariable(value = "project_id") Long projectId,
+            @ApiParam(value = "应用id", required = true)
+            @PathVariable(value = "application_id") Long applicationId,
+            @ApiParam(value = "标签名称", required = true)
+            @RequestParam String tag,
+            @ApiParam(value = "发布日志")
+            @RequestBody String releaseNotes) {
+        devopsGitService.updateTagRelease(projectId, applicationId, tag, releaseNotes);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

@@ -1,0 +1,36 @@
+spring:
+  cloud:
+    bus:
+      enabled: false
+  sleuth:
+    stream:
+      enabled: false
+  datasource:
+    password: sa
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=Mysql;TRACE_LEVEL_SYSTEM_OUT=2;
+    username: sa
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration,org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+hystrix:
+  stream:
+    queue:
+      enabled: false
+data:
+  dir: src/test/resources
+eureka:
+  client:
+    enabled: false
+services:
+  harbor:
+    baseUrl: "https://registry.saas.hand-china.com"
+    username: "admin"
+    password: "Handhand123"
+choerodon:
+  event:
+    consumer:
+      enabled: false # 是否开启，不设置默认开启
+# 使用本地docker里的mysql
+#datasource:
+#  username: root
+#  password: root
+#  url: jdbc:mysql://192.168.99.100:3306/devops_service?useUnicode=true&characterEncoding=utf-8&useSSL=false
