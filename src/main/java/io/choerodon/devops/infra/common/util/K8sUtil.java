@@ -15,10 +15,14 @@ public class K8sUtil {
     private static final String SIGNAL = "Signal:";
     private static final String EXIT_CODE = "ExitCode:";
     private static final String NONE_LABEL = "<none>";
+    private static final String INIT_CONTAINER_COMPLETED = "Init:Completed";
 
     private K8sUtil() {
     }
 
+    private static String getPodStatus(String podStatusReason, String podStatusPhase){
+        return podStatusReason != null ? podStatusReason : podStatusPhase;
+    }
 
     private static String getPodStatus(V1ContainerStateTerminated containerStateTerminated) {
         if (containerStateTerminated.getReason().length() == 0) {
@@ -39,31 +43,40 @@ public class K8sUtil {
     public static String changePodStatus(V1Pod pod) {
         String podStatusPhase = pod.getStatus().getPhase();
         String podStatusReason = pod.getStatus().getReason();
-        String status = podStatusReason != null ? podStatusReason : podStatusPhase;
+        String status = getPodStatus(podStatusPhase, podStatusReason);
         List<V1ContainerStatus> initContainerStatuses = pod.getStatus().getInitContainerStatuses();
         List<V1ContainerStatus> containerStatusList = pod.getStatus().getContainerStatuses();
         if (!ArrayUtil.isEmpty(initContainerStatuses)) {
             V1ContainerState containerState = initContainerStatuses.get(0).getState();
             V1ContainerStateTerminated containerStateTerminated = containerState.getTerminated();
             V1ContainerStateWaiting containerStateWaiting = containerState.getWaiting();
-            if (containerStateTerminated != null) {
-                status = getPodStatus(containerStateTerminated);
-            } else if (containerStateWaiting != null
-                    && !containerStateWaiting.getReason().isEmpty()
-                    && !"PodInitializing".equals(containerStateWaiting.getReason())) {
-                status = INIT + containerStateWaiting.getReason();
-            } else {
-                status = INIT + pod.getSpec().getInitContainers().size();
+            String tempStatus;
+            for(int i=0; i<initContainerStatuses.size(); i++) {
+                if (containerStateTerminated != null) {
+                    tempStatus = getPodStatus(containerStateTerminated);
+                } else if (containerStateWaiting != null
+                        && !containerStateWaiting.getReason().isEmpty()
+                        && !"PodInitializing".equals(containerStateWaiting.getReason())) {
+                    tempStatus = INIT + containerStateWaiting.getReason();
+                } else {
+                    tempStatus = INIT + pod.getSpec().getInitContainers().size();
+                }
+                if(i==0 || !INIT_CONTAINER_COMPLETED.equals(tempStatus)) { status = tempStatus; }
             }
-        } else if (!ArrayUtil.isEmpty(containerStatusList) && !"Pending".equals(podStatusPhase)) {
+        }
+        if (INIT_CONTAINER_COMPLETED.equals(status) && !ArrayUtil.isEmpty(containerStatusList) && !"Pending".equals(podStatusPhase)) {
+            status = getPodStatus(podStatusPhase, podStatusReason);
             V1ContainerState containerState = containerStatusList.get(0).getState();
             V1ContainerStateWaiting containerStateWaiting = containerState.getWaiting();
             V1ContainerStateTerminated containerStateTerminated = containerState.getTerminated();
-
-            if (containerStateWaiting != null && !containerStateWaiting.getReason().isEmpty()) {
-                status = containerStateWaiting.getReason();
-            } else if (containerStateTerminated != null) {
-                status = getPodStatus(containerStateTerminated);
+            for(int i=0; i<containerStatusList.size(); i++) {
+                if (containerStateWaiting != null && !containerStateWaiting.getReason().isEmpty()) {
+                    status = containerStateWaiting.getReason();
+                    break;
+                } else if (containerStateTerminated != null) {
+                    status = getPodStatus(containerStateTerminated);
+                    break;
+                }
             }
         }
         return status;
@@ -190,8 +203,10 @@ public class K8sUtil {
             if (results.size() == max) {
                 more = true;
             }
-            if (!more && v1beta1IngressRule.getHost().length() != 0) {
-                results.add(v1beta1IngressRule.getHost());
+            if (v1beta1IngressRule.getHost() != null) {
+                if (!more && v1beta1IngressRule.getHost().length() != 0) {
+                    results.add(v1beta1IngressRule.getHost());
+                }
             }
         }
         if (results.isEmpty()) {
