@@ -69,6 +69,8 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
     @Autowired
     private GitlabRepository gitlabRepository;
     @Autowired
+    private DevopsGitlabPersonalTokensRepository devopsGitlabPersonalTokensRepository;
+    @Autowired
     private ApplicationTemplateRepository applicationTemplateRepository;
     @Autowired
     private GitUtil gitUtil;
@@ -225,7 +227,9 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
     }
 
     private String getToken(GitlabProjectPayload gitlabProjectPayload, String applicationDir) {
-        List<String> tokens = gitlabRepository.listTokenByUserId(gitlabProjectPayload.getGitlabProjectId(),
+//        List<String> tokens = gitlabRepository.listTokenByUserId(gitlabProjectPayload.getGitlabProjectId(),
+//                applicationDir, gitlabProjectPayload.getUserId());
+        List<String> tokens = devopsGitlabPersonalTokensRepository.listTokenByUserId(gitlabProjectPayload.getGitlabProjectId(),
                 applicationDir, gitlabProjectPayload.getUserId());
         String accessToken;
         accessToken = tokens.isEmpty() ? gitlabRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
