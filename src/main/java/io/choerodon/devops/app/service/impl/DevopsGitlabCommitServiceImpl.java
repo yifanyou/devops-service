@@ -39,23 +39,26 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
     public void create(PushWebHookDTO pushWebHookDTO, String token) {
         ApplicationE applicationE = applicationRepository.queryByToken(token);
         pushWebHookDTO.getCommits().parallelStream().forEach(commitDTO -> {
-            DevopsGitlabCommitE devopsGitlabCommitE = new DevopsGitlabCommitE();
-            devopsGitlabCommitE.setAppId(applicationE.getId());
-            devopsGitlabCommitE.setCommitContent(commitDTO.getMessage());
-            devopsGitlabCommitE.setCommitSha(commitDTO.getId());
-            devopsGitlabCommitE.setRef(pushWebHookDTO.getRef().split("/")[2]);
-            devopsGitlabCommitE.setUrl(commitDTO.getUrl());
-            if ("root".equals(commitDTO.getAuthor().getName())) {
-                devopsGitlabCommitE.setUserId(1L);
-            } else {
-                UserE userE = iamRepository.queryByEmail(applicationE.getProjectE().getId(),
-                        commitDTO.getAuthor().getEmail());
-                if (userE != null) {
-                    devopsGitlabCommitE.setUserId(userE.getId());
+            DevopsGitlabCommitE devopsGitlabCommitE = devopsGitlabCommitRepository.queryBySha(commitDTO.getId());
+            if (devopsGitlabCommitE == null) {
+                devopsGitlabCommitE = new DevopsGitlabCommitE();
+                devopsGitlabCommitE.setAppId(applicationE.getId());
+                devopsGitlabCommitE.setCommitContent(commitDTO.getMessage());
+                devopsGitlabCommitE.setCommitSha(commitDTO.getId());
+                devopsGitlabCommitE.setRef(pushWebHookDTO.getRef().split("/")[2]);
+                devopsGitlabCommitE.setUrl(commitDTO.getUrl());
+                if ("root".equals(commitDTO.getAuthor().getName())) {
+                    devopsGitlabCommitE.setUserId(1L);
+                } else {
+                    UserE userE = iamRepository.queryByEmail(applicationE.getProjectE().getId(),
+                            commitDTO.getAuthor().getEmail());
+                    if (userE != null) {
+                        devopsGitlabCommitE.setUserId(userE.getId());
+                    }
                 }
+                devopsGitlabCommitE.setCommitDate(commitDTO.getTimestamp());
+                devopsGitlabCommitRepository.create(devopsGitlabCommitE);
             }
-            devopsGitlabCommitE.setCommitDate(commitDTO.getTimestamp());
-            devopsGitlabCommitRepository.create(devopsGitlabCommitE);
         });
     }
 
@@ -71,7 +74,7 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String sd = "null".equals(startDate) ? "1970-01-01" : sdf.format(new Date(Long.valueOf(startDate)));
         String ed = "null".equals(endDate) ?
-                sdf.format(new Date(Long.valueOf(System.currentTimeMillis()))) :
+                sdf.format(new Date(System.currentTimeMillis())) :
                 sdf.format(new Date(Long.valueOf(endDate)));
 
         // 查询应用列表下所有commit记录
@@ -107,7 +110,7 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String sd = "null".equals(startDate) ? "1970-01-01" : sdf.format(new Date(Long.valueOf(startDate)));
         String ed = "null".equals(endDate) ?
-                sdf.format(new Date(Long.valueOf(System.currentTimeMillis()))) :
+                sdf.format(new Date(System.currentTimeMillis())) :
                 sdf.format(new Date(Long.valueOf(endDate)));
         // 查询应用列表下所有commit记录
         List<DevopsGitlabCommitE> devopsGitlabCommitES = devopsGitlabCommitRepository

@@ -249,6 +249,14 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
         //检验gitops库是否存在，校验操作人是否是有gitops库的权限
         gitlabGroupMemberService.checkEnvProject(devopsEnvironmentE, userAttrE);
 
+        //更新ingress
+        devopsEnvCommandE.setObjectId(ingressId);
+        DevopsIngressDO devopsIngressDO = devopsIngressRepository.getIngress(ingressId);
+        devopsIngressDO.setCommandId(devopsEnvCommandRepository.create(devopsEnvCommandE).getId());
+        devopsIngressDO.setStatus(IngressStatus.OPERATING.getStatus());
+        devopsIngressRepository.updateIngress(devopsIngressDO);
+
+
         //判断当前容器目录下是否存在环境对应的gitops文件目录，不存在则克隆
         String path = devopsEnvironmentService.handDevopsEnvGitRepository(devopsEnvironmentE);
 
@@ -283,12 +291,6 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                     ingressDO.getId(), INGRESS, devopsEnvironmentE.getId(), path);
         }
 
-        //更新ingress
-        devopsEnvCommandE.setObjectId(ingressId);
-        DevopsIngressDO devopsIngressDO = devopsIngressRepository.getIngress(ingressId);
-        devopsIngressDO.setCommandId(devopsEnvCommandRepository.create(devopsEnvCommandE).getId());
-        devopsIngressDO.setStatus(IngressStatus.OPERATING.getStatus());
-        devopsIngressRepository.updateIngress(devopsIngressDO);
     }
 
 
@@ -394,11 +396,8 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
                                       String path,
                                       DevopsIngressDO devopsIngressDO,
                                       UserAttrE userAttrE, DevopsEnvCommandE devopsEnvCommandE) {
-        ObjectOperation<V1beta1Ingress> objectOperation = new ObjectOperation<>();
-        objectOperation.setType(ingress);
-        objectOperation.operationEnvGitlabFile("ing-" + devopsIngressDO.getName(), envGitLabProjectId, isCreate ? CREATE : UPDATE,
-                userAttrE.getGitlabUserId(), devopsIngressDO.getId(), INGRESS, devopsIngressDO.getEnvId(), path);
-        //文件操作成功后才创建或更新数据,避免文件数据不一致
+
+        //创建或更新数据
         if (isCreate) {
             Long ingressId = devopsIngressRepository.createIngress(devopsIngressDO).getId();
             devopsEnvCommandE.setObjectId(ingressId);
@@ -410,6 +409,12 @@ public class DevopsIngressServiceImpl implements DevopsIngressService {
             devopsIngressDO.setCommandId(devopsEnvCommandRepository.create(devopsEnvCommandE).getId());
             devopsIngressRepository.updateIngressAndIngressPath(devopsIngressDO);
         }
+
+        ObjectOperation<V1beta1Ingress> objectOperation = new ObjectOperation<>();
+        objectOperation.setType(ingress);
+        objectOperation.operationEnvGitlabFile("ing-" + devopsIngressDO.getName(), envGitLabProjectId, isCreate ? CREATE : UPDATE,
+                userAttrE.getGitlabUserId(), devopsIngressDO.getId(), INGRESS, devopsIngressDO.getEnvId(), path);
+
     }
 
 

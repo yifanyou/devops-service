@@ -38,8 +38,6 @@ spec:
         volumeMounts:
         - mountPath: /var/choerodon
           name: tools-jar
-        resources:
-{{ toYaml .Values.resources | indent 12 }}
       restartPolicy: Never
       volumes:
       - emptyDir: {}
