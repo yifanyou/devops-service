@@ -236,7 +236,7 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
 //                applicationDir, gitlabProjectPayload.getUserId()) : tokens.get(tokens.size() - 1);
 
         accessToken = tokens.isEmpty() ? devopsGitlabPersonalTokensRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
-                applicationDir, gitlabProjectPayload.getUserId(), GitUserNameUtil.getUserId()) : tokens.get(tokens.size() - 1);
+                applicationDir, gitlabProjectPayload.getUserId(), gitlabProjectPayload.getUserId()) : tokens.get(tokens.size() - 1);
         return accessToken;
     }
 

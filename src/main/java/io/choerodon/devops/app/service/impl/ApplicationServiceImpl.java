@@ -418,8 +418,9 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (tokens.isEmpty()) {
 //            accessToken = gitlabRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
 //                    applicationDir, gitlabProjectPayload.getUserId());
+            //TODO why user cannot get
             accessToken = devopsGitlabPersonalTokensRepository.createToken(gitlabProjectPayload.getGitlabProjectId(),
-                    applicationDir, gitlabProjectPayload.getUserId(), GitUserNameUtil.getUserId());
+                    applicationDir, gitlabProjectPayload.getUserId(), gitlabProjectPayload.getUserId());
         } else {
             accessToken = tokens.get(tokens.size() - 1);
         }
