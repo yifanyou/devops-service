@@ -5,9 +5,9 @@
 
     <select id="queryByGitlabUserId" resultType="io.choerodon.devops.infra.dataobject.DevopsGitlabPersonalTokensDO">
         select
-          dgpt.id
-          dgpt.gitlab_user_id
-          dgpt.user_id
+          dgpt.id,
+          dgpt.gitlab_user_id,
+          dgpt.user_id,
           dgpt.token
         from devops_gitlab_personal_tokens dgpt
         where dgpt.gitlab_user_id = #{gitlabUserId}
