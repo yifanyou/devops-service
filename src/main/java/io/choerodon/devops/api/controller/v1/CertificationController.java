@@ -41,13 +41,14 @@ public class CertificationController {
     /**
      * 项目下创建证书
      *
-     * @param projectId  项目id
-     * @param certification 证书
-     * @param key        key文件
-     * @param cert       cert文件
+     * @param projectId     项目id
+     * @param certification 证书名
+     * @param key           key文件
+     * @param cert          cert文件
      * @return 201, "Created"
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "项目下创建证书")
     @PostMapping
     public ResponseEntity create(
@@ -70,7 +71,8 @@ public class CertificationController {
      * @param certId    证书id
      * @return 204, "No Content"
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "项目下删除证书")
     @DeleteMapping
     public ResponseEntity delete(
@@ -93,7 +95,8 @@ public class CertificationController {
      * @return CertificationDTO page
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_OWNER, InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER,
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "分页查询")
     @CustomPageRequest
     @PostMapping("/list_by_options")
@@ -119,7 +122,8 @@ public class CertificationController {
      * @param domain    域名
      * @return CertificationDTO list
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "通过域名查询已生效的证书")
     @PostMapping("/active")
     public ResponseEntity<List<CertificationDTO>> getActiveByDomain(
@@ -142,7 +146,8 @@ public class CertificationController {
      * @param certName  证书名称
      * @return Boolean
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "校验证书名称唯一性")
     @GetMapping("/unique")
     public ResponseEntity<Boolean> checkCertNameUniqueInEnv(

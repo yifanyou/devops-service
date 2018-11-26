@@ -8,6 +8,7 @@ import com.google.gson.Gson;
 import org.eclipse.jgit.api.Git;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -27,7 +28,7 @@ import io.choerodon.devops.app.service.ApplicationService;
 import io.choerodon.devops.domain.application.entity.*;
 import io.choerodon.devops.domain.application.entity.gitlab.CommitE;
 import io.choerodon.devops.domain.application.entity.gitlab.GitlabGroupE;
-import io.choerodon.devops.domain.application.entity.gitlab.GitlabGroupMemberE;
+import io.choerodon.devops.domain.application.entity.gitlab.GitlabMemberE;
 import io.choerodon.devops.domain.application.entity.gitlab.GitlabUserE;
 import io.choerodon.devops.domain.application.event.DevOpsAppPayload;
 import io.choerodon.devops.domain.application.factory.ApplicationFactory;
@@ -83,6 +84,9 @@ public class ApplicationServiceImpl implements ApplicationService {
     private DevopsGitRepository devopsGitRepository;
     @Autowired
     private SagaClient sagaClient;
+    @Autowired
+    private ApplicationMarketRepository applicationMarketRepository;
+
 
     @Override
     @Saga(code = "devops-create-gitlab-project",
@@ -94,7 +98,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
         ApplicationE applicationE = ConvertHelper.convert(applicationDTO, ApplicationE.class);
         applicationE.initProjectE(projectId);
-        applicationRepository.checkName(applicationE);
+        applicationRepository.checkName(applicationE.getProjectE().getId(), applicationE.getName());
         applicationRepository.checkCode(applicationE);
         applicationE.initActive(true);
         applicationE.initSynchro(false);
@@ -102,19 +106,19 @@ public class ApplicationServiceImpl implements ApplicationService {
         if (gitlabGroupE == null) {
             throw new CommonException("error.group.not.sync");
         }
-        GitlabGroupMemberE groupMemberE = gitlabGroupMemberRepository.getUserMemberByUserId(
-                gitlabGroupE.getGitlabGroupId(),
+        GitlabMemberE gitlabMemberE = gitlabGroupMemberRepository.getUserMemberByUserId(
+                TypeUtil.objToInteger(gitlabGroupE.getDevopsAppGroupId()),
                 TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
-        if (groupMemberE == null || groupMemberE.getAccessLevel() != AccessLevel.OWNER.toValue()) {
+        if (gitlabMemberE == null || gitlabMemberE.getAccessLevel() != AccessLevel.OWNER.toValue()) {
             throw new CommonException("error.user.not.owner");
         }
-        // 创建sega payload
+        // 创建saga payload
         DevOpsAppPayload devOpsAppPayload = new DevOpsAppPayload();
         devOpsAppPayload.setType(APPLICATION);
         devOpsAppPayload.setPath(applicationDTO.getCode());
         devOpsAppPayload.setOrganizationId(organization.getId());
         devOpsAppPayload.setUserId(TypeUtil.objToInteger(userAttrE.getGitlabUserId()));
-        devOpsAppPayload.setGroupId(gitlabGroupE.getGitlabGroupId());
+        devOpsAppPayload.setGroupId(TypeUtil.objToInteger(gitlabGroupE.getDevopsAppGroupId()));
         applicationE = applicationRepository.create(applicationE);
         if (applicationE.getId() == null) {
             throw new CommonException("error.application.create.insert");
@@ -144,8 +148,9 @@ public class ApplicationServiceImpl implements ApplicationService {
         ProjectE projectE = iamRepository.queryIamProject(projectId);
         Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
         ApplicationE applicationE = applicationRepository.query(applicationId);
+        UserAttrE userAttrE = userAttrRepository.queryById(DetailsHelper.getUserDetails().getUserId());
         gitlabRepository.deleteDevOpsApp(organization.getCode() + "-" + projectE.getCode(),
-                applicationE.getCode(), DetailsHelper.getUserDetails().getUserId().intValue());
+                applicationE.getCode(), userAttrE.getGitlabUserId().intValue());
         applicationRepository.delete(applicationId);
     }
 
@@ -153,7 +158,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     public Boolean update(Long projectId, ApplicationUpdateDTO applicationUpdateDTO) {
         ApplicationE applicationE = ConvertHelper.convert(applicationUpdateDTO, ApplicationE.class);
         applicationE.initProjectE(projectId);
-        applicationRepository.checkName(applicationE);
+        applicationRepository.checkName(applicationE.getProjectE().getId(), applicationE.getName());
         if (applicationRepository.update(applicationE) != 1) {
             throw new CommonException("error.application.update");
         }
@@ -182,17 +187,15 @@ public class ApplicationServiceImpl implements ApplicationService {
         ProjectE projectE = iamRepository.queryIamProject(projectId);
         Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
         String urlSlash = gitlabUrl.endsWith("/") ? "" : "/";
-        applicationES.getContent().parallelStream()
-                .forEach(t -> {
-                            if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
-                                t.initGitlabProjectEByUrl(gitlabUrl + urlSlash
-                                        + organization.getCode() + "-" + projectE.getCode() + "/"
-                                        + t.getCode() + ".git");
-                                getSonarUrl(projectE, organization, t);
-                            }
-                        }
-                );
-
+        applicationES.getContent().forEach(t -> {
+                    if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
+                        t.initGitlabProjectEByUrl(
+                                gitlabUrl + urlSlash + organization.getCode() + "-" + projectE.getCode() + "/" +
+                                        t.getCode() + ".git");
+                        getSonarUrl(projectE, organization, t);
+                    }
+                }
+        );
         return ConvertPageHelper.convertPage(applicationES, ApplicationRepDTO.class);
     }
 
@@ -242,7 +245,23 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     public List<ApplicationRepDTO> listByActive(Long projectId) {
-        return ConvertHelper.convertList(applicationRepository.listByActive(projectId), ApplicationRepDTO.class);
+        List<ApplicationE> applicationEList = applicationRepository.listByActive(projectId);
+
+        ProjectE projectE = iamRepository.queryIamProject(projectId);
+        Organization organization = iamRepository.queryOrganizationById(projectE.getOrganization().getId());
+
+        String urlSlash = gitlabUrl.endsWith("/") ? "" : "/";
+        applicationEList.forEach(t -> {
+                    if (t.getGitlabProjectE() != null && t.getGitlabProjectE().getId() != null) {
+                        t.initGitlabProjectEByUrl(gitlabUrl + urlSlash
+                                + organization.getCode() + "-" + projectE.getCode() + "/"
+                                + t.getCode() + ".git");
+                        getSonarUrl(projectE, organization, t);
+                    }
+                }
+        );
+
+        return ConvertHelper.convertList(applicationEList, ApplicationRepDTO.class);
     }
 
     @Override
@@ -252,10 +271,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 
     @Override
     public void checkName(Long projectId, String name) {
-        ApplicationE applicationE = ApplicationFactory.createApplicationE();
-        applicationE.initProjectE(projectId);
-        applicationE.setName(name);
-        applicationRepository.checkName(applicationE);
+        applicationRepository.checkName(projectId, name);
     }
 
     @Override
@@ -318,15 +334,25 @@ public class ApplicationServiceImpl implements ApplicationService {
             if (branchDO.getName() == null) {
                 gitUtil.push(git, applicationDir, applicationE.getGitlabProjectE().getRepoURL(),
                         gitlabUserE.getUsername(), accessToken);
-                gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
-                        AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
+                branchDO = devopsGitRepository.getBranch(gitlabProjectDO.getId(), MASTER);
+                //解决push代码之后gitlab给master分支设置保护分支速度和程序运行速度不一致
+                if (!branchDO.getProtected()) {
+                    try {
+                        gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
+                                AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
+                    } catch (CommonException e) {
+                        branchDO = devopsGitRepository.getBranch(gitlabProjectDO.getId(), MASTER);
+                        if (!branchDO.getProtected()) {
+                            throw new CommonException(e);
+                        }
+                    }
+                }
             } else {
-                if (branchDO.getProtected()) {
+                if (!branchDO.getProtected()) {
                     gitlabRepository.createProtectBranch(gitlabProjectPayload.getGitlabProjectId(), MASTER,
                             AccessLevel.MASTER.toString(), AccessLevel.MASTER.toString(), gitlabProjectPayload.getUserId());
                 }
             }
-
             initMasterBranch(gitlabProjectPayload, applicationE);
         }
         try {
@@ -336,6 +362,8 @@ public class ApplicationServiceImpl implements ApplicationService {
                 gitlabRepository.addVariable(gitlabProjectPayload.getGitlabProjectId(), "Token",
                         token,
                         false, gitlabProjectPayload.getUserId());
+            } else {
+                token = variables.get(0).getValue();
             }
             applicationE.setToken(token);
             applicationE.initGitlabProjectE(
@@ -353,6 +381,8 @@ public class ApplicationServiceImpl implements ApplicationService {
                 applicationE.initHookId(TypeUtil.objToLong(gitlabRepository.createWebHook(
                         gitlabProjectPayload.getGitlabProjectId(), gitlabProjectPayload.getUserId(), projectHook)
                         .getId()));
+            } else {
+                applicationE.initHookId(TypeUtil.objToLong(projectHooks.get(0).getId()));
             }
             if (applicationRepository.update(applicationE) != 1) {
                 throw new CommonException("error.application.update");
@@ -402,7 +432,7 @@ public class ApplicationServiceImpl implements ApplicationService {
         } catch (Exception e) {
             //删除模板
             gitUtil.deleteWorkingDirectory(applicationDir);
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
     }
 
@@ -446,9 +476,27 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     @Override
-    public List<ApplicationCodeDTO> listByEnvId(Long projectId, Long envId, String status) {
-        return ConvertHelper.convertList(applicationRepository.listByEnvId(projectId, envId, status),
+    public List<ApplicationCodeDTO> listByEnvId(Long projectId, Long envId, String status, Long appId) {
+        List<ApplicationCodeDTO> applicationCodeDTOS = ConvertHelper.convertList(applicationRepository.listByEnvId(projectId, envId, status),
                 ApplicationCodeDTO.class);
+        if (appId != null) {
+            ApplicationE applicationE = applicationRepository.query(appId);
+            ApplicationCodeDTO applicationCodeDTO = new ApplicationCodeDTO();
+            BeanUtils.copyProperties(applicationE, applicationCodeDTO);
+            ApplicationMarketE applicationMarketE = applicationMarketRepository.queryByAppId(appId);
+            if (applicationMarketE != null) {
+                applicationCodeDTO.setPublishLevel(applicationMarketE.getPublishLevel());
+                applicationCodeDTO.setContributor(applicationMarketE.getContributor());
+                applicationCodeDTO.setDescription(applicationMarketE.getDescription());
+            }
+            for (int i = 0; i < applicationCodeDTOS.size(); i++) {
+                if (applicationCodeDTOS.get(i).getId().equals(applicationE.getId())) {
+                    applicationCodeDTOS.remove(applicationCodeDTOS.get(i));
+                }
+            }
+            applicationCodeDTOS.add(0, applicationCodeDTO);
+        }
+        return applicationCodeDTOS;
     }
 
     @Override

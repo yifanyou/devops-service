@@ -12,7 +12,7 @@ public class DevopsIngressValidator {
     //ingress name
     private static final String NAME_PATTERN = "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*";
     // ingress subdomain
-    private static final String SUB_PATH_PATTERN = "[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*";
+    private static final String SUB_PATH_PATTERN = "^\\/(\\S)*$";
 
     private DevopsIngressValidator() {
     }
@@ -30,8 +30,7 @@ public class DevopsIngressValidator {
      * 参数校验
      */
     public static void checkPath(String path) {
-        String subPath = path.substring(1);
-        if (!subPath.isEmpty() && !Pattern.matches(SUB_PATH_PATTERN, subPath)) {
+        if (!Pattern.matches(SUB_PATH_PATTERN, path)) {
             throw new CommonException("error.ingress.subPath.notMatch");
         }
     }

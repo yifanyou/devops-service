@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -22,6 +23,7 @@ import io.choerodon.devops.domain.application.repository.CertificationRepository
 import io.choerodon.devops.domain.application.repository.DevopsEnvironmentRepository;
 import io.choerodon.devops.domain.application.repository.DevopsIngressRepository;
 import io.choerodon.devops.domain.application.repository.DevopsServiceRepository;
+import io.choerodon.devops.infra.common.util.EnvUtil;
 import io.choerodon.devops.infra.common.util.TypeUtil;
 import io.choerodon.devops.infra.common.util.enums.IngressStatus;
 import io.choerodon.devops.infra.common.util.enums.ServiceStatus;
@@ -155,9 +157,9 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
             setIngressDTOCert(t.getCertId(), devopsIngressDTO);
             for (Map.Entry<String, EnvSession> entry : envs.entrySet()) {
                 EnvSession envSession = entry.getValue();
-                if (envSession.getEnvId().equals(t.getEnvId())
-                        && agentExpectVersion.compareTo(
-                        envSession.getVersion() == null ? "0" : envSession.getVersion()) < 1) {
+                DevopsEnvironmentE devopsEnvironmentE = environmentRepository.queryById(t.getEnvId());
+                if (envSession.getClusterId().equals(devopsEnvironmentE.getClusterE().getId())
+                        && EnvUtil.compareVersion(envSession.getVersion(), agentExpectVersion) != 1) {
                     devopsIngressDTO.setEnvStatus(true);
                 }
             }
@@ -237,8 +239,8 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     }
 
     @Override
-    public Boolean checkIngressAndPath(Long id, String domain, String path) {
-        return !devopsIngressPathMapper.checkDomainAndPath(id, domain, path);
+    public Boolean checkIngressAndPath(Long envId, String domain, String path, Long id) {
+        return !devopsIngressPathMapper.checkDomainAndPath(envId, domain, path, id);
     }
 
     @Override
@@ -327,5 +329,18 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
                 devopsServiceE == null ? ServiceStatus.DELETED.getStatus() : devopsServiceE.getStatus());
         devopsIngressPathDTO.setServicePort(e.getServicePort());
         devopsIngressDTO.addDevopsIngressPathDTO(devopsIngressPathDTO);
+    }
+
+    @Override
+    public void deleteIngressAndIngressPathByEnvId(Long envId) {
+        DevopsIngressDO devopsIngressDO = new DevopsIngressDO();
+        devopsIngressDO.setEnvId(envId);
+        // 获取环境下的所有域名ids
+        List<Long> allIngressIds = devopsIngressMapper.select(devopsIngressDO).stream().map(DevopsIngressDO::getId)
+                .collect(Collectors.toList());
+        devopsIngressMapper.delete(devopsIngressDO);
+        if (!allIngressIds.isEmpty()) {
+            devopsIngressPathMapper.deleteByIngressIds(allIngressIds);
+        }
     }
 }

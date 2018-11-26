@@ -32,6 +32,7 @@ import io.choerodon.devops.infra.common.util.GitUserNameUtil;
 import io.choerodon.devops.infra.common.util.GitUtil;
 import io.choerodon.devops.infra.common.util.TypeUtil;
 import io.choerodon.devops.infra.common.util.enums.Visibility;
+import io.choerodon.devops.infra.dataobject.gitlab.BranchDO;
 import io.choerodon.devops.infra.dataobject.gitlab.GitlabProjectDO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
@@ -76,6 +77,10 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
     private UserAttrRepository userAttrRepository;
     @Autowired
     private GitlabUserRepository gitlabUserRepository;
+    @Autowired
+    private DevopsProjectRepository devopsProjectRepository;
+    @Autowired
+    private DevopsGitRepository devopsGitRepository;
 
     @Autowired
     private SagaClient sagaClient;
@@ -101,10 +106,10 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
             gitlabGroupENew.initName(organization.getCode() + "_" + TEMPLATE);
             gitlabGroupENew.initPath(organization.getCode() + "_" + TEMPLATE);
             gitlabGroupENew.initVisibility(Visibility.PUBLIC);
-            gitlabGroupId = gitlabRepository.createGroup(
-                    gitlabGroupENew, TypeUtil.objToInteger(userAttrE.getGitlabUserId())).getGitlabGroupId();
+            gitlabGroupId = TypeUtil.objToInteger(gitlabRepository.createGroup(
+                    gitlabGroupENew, TypeUtil.objToInteger(userAttrE.getGitlabUserId())).getDevopsAppGroupId());
         } else {
-            gitlabGroupId = gitlabGroupE.getGitlabGroupId();
+            gitlabGroupId = TypeUtil.objToInteger(gitlabGroupE.getDevopsAppGroupId());
         }
         GitlabProjectPayload gitlabProjectPayload = new GitlabProjectPayload();
         gitlabProjectPayload.setGroupId(gitlabGroupId);
@@ -182,12 +187,20 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
 
     @Override
     public void operationApplicationTemplate(GitlabProjectPayload gitlabProjectPayload) {
-        GitlabProjectDO gitlabProjectDO = gitlabRepository.createProject(gitlabProjectPayload.getGroupId(),
-                gitlabProjectPayload.getPath(), gitlabProjectPayload.getUserId(), true);
-        gitlabProjectPayload.setGitlabProjectId(gitlabProjectDO.getId());
 
         ApplicationTemplateE applicationTemplateE = applicationTemplateRepository.queryByCode(
                 gitlabProjectPayload.getOrganizationId(), gitlabProjectPayload.getPath());
+
+        Organization organization = iamRepository.queryOrganizationById(gitlabProjectPayload.getOrganizationId());
+
+        GitlabProjectDO gitlabProjectDO = gitlabRepository.getProjectByName(organization.getCode() + "_template", applicationTemplateE.getCode(), gitlabProjectPayload.getUserId());
+
+        if (gitlabProjectDO.getId() == null) {
+            gitlabProjectDO = gitlabRepository.createProject(gitlabProjectPayload.getGroupId(),
+                    gitlabProjectPayload.getPath(), gitlabProjectPayload.getUserId(), true);
+        }
+
+        gitlabProjectPayload.setGitlabProjectId(gitlabProjectDO.getId());
 
         applicationTemplateE.initGitlabProjectE(
                 TypeUtil.objToInteger(gitlabProjectPayload.getGitlabProjectId()));
@@ -211,16 +224,22 @@ public class ApplicationTemplateServiceImpl implements ApplicationTemplateServic
             GitlabUserE gitlabUserE = gitlabUserRepository.getGitlabUserByUserId(gitlabProjectPayload.getUserId());
             repoUrl = applicationTemplateE.getRepoUrl();
             repoUrl = repoUrl.startsWith("/") ? repoUrl.substring(1) : repoUrl;
-            gitUtil.push(
-                    git,
-                    applicationDir,
-                    !gitlabUrl.endsWith("/") ? gitlabUrl + "/" + repoUrl : gitlabUrl + repoUrl,
-                    gitlabUserE.getUsername(),
-                    accessToken);
+
+            BranchDO branchDO = devopsGitRepository.getBranch(gitlabProjectDO.getId(), MASTER);
+            if (branchDO.getName() == null) {
+                gitUtil.push(
+                        git,
+                        applicationDir,
+                        !gitlabUrl.endsWith("/") ? gitlabUrl + "/" + repoUrl : gitlabUrl + repoUrl,
+                        gitlabUserE.getUsername(),
+                        accessToken);
+            }
         } else {
-            gitlabRepository.createFile(gitlabProjectPayload.getGitlabProjectId(),
-                    README, README_CONTENT, "ADD README",
-                    gitlabProjectPayload.getUserId());
+            if (!gitlabRepository.getFile(gitlabProjectDO.getId(), MASTER, README)) {
+                gitlabRepository.createFile(gitlabProjectPayload.getGitlabProjectId(),
+                        README, README_CONTENT, "ADD README",
+                        gitlabProjectPayload.getUserId());
+            }
         }
     }
 

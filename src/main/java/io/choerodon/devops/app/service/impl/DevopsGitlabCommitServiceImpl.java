@@ -1,6 +1,5 @@
 package io.choerodon.devops.app.service.impl;
 
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -10,23 +9,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import io.choerodon.core.domain.Page;
-import io.choerodon.devops.api.dto.CommitFormRecordDTO;
-import io.choerodon.devops.api.dto.CommitFormUserDTO;
-import io.choerodon.devops.api.dto.DevopsGitlabCommitDTO;
-import io.choerodon.devops.api.dto.PushWebHookDTO;
+import io.choerodon.devops.api.dto.*;
 import io.choerodon.devops.app.service.DevopsGitlabCommitService;
 import io.choerodon.devops.domain.application.entity.ApplicationE;
 import io.choerodon.devops.domain.application.entity.DevopsGitlabCommitE;
+import io.choerodon.devops.domain.application.entity.gitlab.CommitE;
 import io.choerodon.devops.domain.application.entity.iam.UserE;
 import io.choerodon.devops.domain.application.repository.ApplicationRepository;
+import io.choerodon.devops.domain.application.repository.DevopsGitRepository;
 import io.choerodon.devops.domain.application.repository.DevopsGitlabCommitRepository;
 import io.choerodon.devops.domain.application.repository.IamRepository;
+import io.choerodon.devops.infra.common.util.TypeUtil;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 @Service
 public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService {
 
     private static final Gson gson = new Gson();
+    private static final Integer ADMIN = 1;
 
     @Autowired
     IamRepository iamRepository;
@@ -34,49 +34,77 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
     private ApplicationRepository applicationRepository;
     @Autowired
     private DevopsGitlabCommitRepository devopsGitlabCommitRepository;
+    @Autowired
+    private DevopsGitRepository devopsGitRepository;
 
     @Override
     public void create(PushWebHookDTO pushWebHookDTO, String token) {
         ApplicationE applicationE = applicationRepository.queryByToken(token);
-        pushWebHookDTO.getCommits().parallelStream().forEach(commitDTO -> {
-            DevopsGitlabCommitE devopsGitlabCommitE = new DevopsGitlabCommitE();
-            devopsGitlabCommitE.setAppId(applicationE.getId());
-            devopsGitlabCommitE.setCommitContent(commitDTO.getMessage());
-            devopsGitlabCommitE.setCommitSha(commitDTO.getId());
-            devopsGitlabCommitE.setRef(pushWebHookDTO.getRef().split("/")[2]);
-            devopsGitlabCommitE.setUrl(commitDTO.getUrl());
-            if ("root".equals(commitDTO.getAuthor().getName())) {
-                devopsGitlabCommitE.setUserId(1L);
-            } else {
-                UserE userE = iamRepository.queryByEmail(applicationE.getProjectE().getId(),
-                        commitDTO.getAuthor().getEmail());
-                if (userE != null) {
-                    devopsGitlabCommitE.setUserId(userE.getId());
+        String ref = pushWebHookDTO.getRef().split("/")[2];
+        if (pushWebHookDTO.getCommits().size() != 0) {
+            pushWebHookDTO.getCommits().stream().forEach(commitDTO -> {
+                DevopsGitlabCommitE devopsGitlabCommitE = devopsGitlabCommitRepository.queryByShaAndRef(commitDTO.getId(), ref);
+
+                if (devopsGitlabCommitE == null) {
+                    devopsGitlabCommitE = new DevopsGitlabCommitE();
+                    devopsGitlabCommitE.setAppId(applicationE.getId());
+                    devopsGitlabCommitE.setCommitContent(commitDTO.getMessage());
+                    devopsGitlabCommitE.setCommitSha(commitDTO.getId());
+                    devopsGitlabCommitE.setRef(ref);
+                    devopsGitlabCommitE.setUrl(commitDTO.getUrl());
+                    if ("root".equals(commitDTO.getAuthor().getName())) {
+                        devopsGitlabCommitE.setUserId(1L);
+                    } else {
+                        UserE userE = iamRepository.queryByEmail(applicationE.getProjectE().getId(),
+                                commitDTO.getAuthor().getEmail());
+                        if (userE != null) {
+                            devopsGitlabCommitE.setUserId(userE.getId());
+                        }
+                    }
+                    devopsGitlabCommitE.setCommitDate(commitDTO.getTimestamp());
+                    devopsGitlabCommitRepository.create(devopsGitlabCommitE);
                 }
+            });
+        } else {
+            //直接从一个分支切出来另外一个分支，没有commits记录
+            DevopsGitlabCommitE devopsGitlabCommitE = devopsGitlabCommitRepository.queryByShaAndRef(pushWebHookDTO.getCheckoutSha(), ref);
+            if (devopsGitlabCommitE == null) {
+                CommitE commitE = devopsGitRepository.getCommit(TypeUtil.objToInteger(applicationE.getGitlabProjectE().getId()), pushWebHookDTO.getCheckoutSha(), ADMIN);
+                devopsGitlabCommitE = new DevopsGitlabCommitE();
+                devopsGitlabCommitE.setAppId(applicationE.getId());
+                devopsGitlabCommitE.setCommitContent(commitE.getMessage());
+                devopsGitlabCommitE.setCommitSha(commitE.getId());
+                devopsGitlabCommitE.setRef(ref);
+                devopsGitlabCommitE.setUrl(commitE.getUrl());
+                if ("root".equals(commitE.getAuthorName())) {
+                    devopsGitlabCommitE.setUserId(1L);
+                } else {
+                    UserE userE = iamRepository.queryByEmail(applicationE.getProjectE().getId(),
+                            commitE.getAuthorEmail());
+                    if (userE != null) {
+                        devopsGitlabCommitE.setUserId(userE.getId());
+                    }
+                }
+                devopsGitlabCommitE.setCommitDate(commitE.getCommittedDate());
+                devopsGitlabCommitRepository.create(devopsGitlabCommitE);
             }
-            devopsGitlabCommitE.setCommitDate(commitDTO.getTimestamp());
-            devopsGitlabCommitRepository.create(devopsGitlabCommitE);
-        });
+        }
+
     }
 
     @Override
-    public DevopsGitlabCommitDTO getCommits(Long projectId, String appIds, String startDate, String endDate) {
+    public DevopsGitlabCommitDTO getCommits(Long projectId, String appIds, Date startDate, Date endDate) {
 
         List<Long> appIdsMap = gson.fromJson(appIds, new TypeToken<List<Long>>() {
         }.getType());
         if (appIdsMap.isEmpty()) {
             return new DevopsGitlabCommitDTO();
         }
-        // 如果传入的时间为null，表示查询至今所有的commit记录
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        String sd = "null".equals(startDate) ? "1970-01-01" : sdf.format(new Date(Long.valueOf(startDate)));
-        String ed = "null".equals(endDate) ?
-                sdf.format(new Date(Long.valueOf(System.currentTimeMillis()))) :
-                sdf.format(new Date(Long.valueOf(endDate)));
+
 
         // 查询应用列表下所有commit记录
         List<DevopsGitlabCommitE> devopsGitlabCommitES = devopsGitlabCommitRepository
-                .listCommits(projectId, appIdsMap, sd, ed);
+                .listCommits(projectId, appIdsMap, startDate, endDate);
         if (devopsGitlabCommitES.isEmpty()) {
             return new DevopsGitlabCommitDTO();
         }
@@ -96,25 +124,25 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
 
     @Override
     public Page<CommitFormRecordDTO> getRecordCommits(Long projectId, String appIds, PageRequest pageRequest,
-                                                      String startDate, String endDate) {
+                                                      Date startDate, Date endDate) {
 
         List<Long> appIdsMap = gson.fromJson(appIds, new TypeToken<List<Long>>() {
         }.getType());
         if (appIdsMap.isEmpty()) {
             return new Page<>();
         }
-        // 如果传入的时间为null，表示查询至今所有的commit记录
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        String sd = "null".equals(startDate) ? "1970-01-01" : sdf.format(new Date(Long.valueOf(startDate)));
-        String ed = "null".equals(endDate) ?
-                sdf.format(new Date(Long.valueOf(System.currentTimeMillis()))) :
-                sdf.format(new Date(Long.valueOf(endDate)));
+
         // 查询应用列表下所有commit记录
         List<DevopsGitlabCommitE> devopsGitlabCommitES = devopsGitlabCommitRepository
-                .listCommits(projectId, appIdsMap, sd, ed);
+                .listCommits(projectId, appIdsMap, startDate, endDate);
         Map<Long, UserE> userMap = getUserDOMap(devopsGitlabCommitES);
         // 获取最近的commit(返回所有的commit记录，按时间先后排序，分页查询)
-        return getCommitFormRecordDTOS(projectId, appIdsMap, pageRequest, userMap, sd, ed);
+        return getCommitFormRecordDTOS(projectId, appIdsMap, pageRequest, userMap, startDate, endDate);
+    }
+
+    @Override
+    public void createByTag(TagHookDTO tagHookDTO, String token) {
+
     }
 
     private Map<Long, UserE> getUserDOMap(List<DevopsGitlabCommitE> devopsGitlabCommitES) {
@@ -159,7 +187,7 @@ public class DevopsGitlabCommitServiceImpl implements DevopsGitlabCommitService 
     }
 
     private Page<CommitFormRecordDTO> getCommitFormRecordDTOS(Long projectId, List<Long> appId, PageRequest pageRequest,
-                                                              Map<Long, UserE> userMap, String startDate, String endDate) {
+                                                              Map<Long, UserE> userMap, Date startDate, Date endDate) {
         return devopsGitlabCommitRepository.pageCommitRecord(projectId, appId, pageRequest, userMap, startDate, endDate);
     }
 

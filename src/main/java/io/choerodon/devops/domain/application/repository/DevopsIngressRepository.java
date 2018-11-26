@@ -36,7 +36,7 @@ public interface DevopsIngressRepository {
 
     Boolean checkIngressName(Long envId, String name);
 
-    Boolean checkIngressAndPath(Long id, String domain, String path);
+    Boolean checkIngressAndPath(Long envId, String domain, String path, Long id);
 
     DevopsIngressE selectByEnvAndName(Long envId, String name);
 
@@ -59,4 +59,6 @@ public interface DevopsIngressRepository {
     Boolean checkEnvHasIngress(Long envId);
 
     List<DevopsIngressE> list();
+
+    void deleteIngressAndIngressPathByEnvId(Long envId);
 }

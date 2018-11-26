@@ -37,7 +37,7 @@ public class ApplicationInstanceRepositoryImpl implements ApplicationInstanceRep
     @Override
     public Page<ApplicationInstanceE> listApplicationInstance(Long projectId, PageRequest pageRequest,
                                                               Long envId, Long versionId, Long appId, String params) {
-        Map<String, Object> maps = gson.fromJson(params, Map.class);
+        Map maps = gson.fromJson(params, Map.class);
         Map<String, Object> searchParamMap = TypeUtil.cast(maps.get(TypeUtil.SEARCH_PARAM));
         String paramMap = TypeUtil.cast(maps.get(TypeUtil.PARAM));
         Page<ApplicationInstanceDO> applicationInstanceDOPage = PageHelper.doPageAndSort(pageRequest, () ->
@@ -79,6 +79,13 @@ public class ApplicationInstanceRepositoryImpl implements ApplicationInstanceRep
     }
 
     @Override
+    public List<ApplicationInstanceE> listByAppIdAndEnvId(Long projectId, Long appId, Long envId) {
+        return ConvertHelper.convertList(applicationInstanceMapper.listRunningAndFailedInstance(
+                projectId, envId, appId),
+                ApplicationInstanceE.class);
+    }
+
+    @Override
     public int checkOptions(Long envId, Long appId, Long appInstanceId) {
         return applicationInstanceMapper.checkOptions(envId, appId, appInstanceId);
     }
@@ -108,8 +115,11 @@ public class ApplicationInstanceRepositoryImpl implements ApplicationInstanceRep
     }
 
     @Override
-    public List<ApplicationInstancesDO> getDeployInstances(Long projectId, Long appId, Long envGroupId) {
-        return applicationInstanceMapper.listApplicationInstances(projectId, appId, envGroupId);
+    public List<ApplicationInstancesDO> getDeployInstances(Long projectId, Long appId, List<Long> envIds) {
+        if (envIds != null && envIds.isEmpty()) {
+            envIds = null;
+        }
+        return applicationInstanceMapper.listApplicationInstances(projectId, appId, envIds);
     }
 
     @Override
@@ -129,25 +139,48 @@ public class ApplicationInstanceRepositoryImpl implements ApplicationInstanceRep
 
     @Override
     public List<DeployDO> listDeployTime(Long projectId, Long envId, Long[] appIds, Date startTime, Date endTime) {
-        return applicationInstanceMapper.listDeployTime(projectId, envId, appIds, new java.sql.Date(startTime.getTime()), new java.sql.Date(endTime.getTime()));
+        return applicationInstanceMapper
+                .listDeployTime(projectId, envId, appIds, new java.sql.Date(startTime.getTime()),
+                        new java.sql.Date(endTime.getTime()));
     }
 
     @Override
     public List<DeployDO> listDeployFrequency(Long projectId, Long[] envIds, Long appId, Date startTime, Date endTime) {
-        return applicationInstanceMapper.listDeployFrequency(projectId, envIds, appId, new java.sql.Date(startTime.getTime()), new java.sql.Date(endTime.getTime()));
+        return applicationInstanceMapper
+                .listDeployFrequency(projectId, envIds, appId, new java.sql.Date(startTime.getTime()),
+                        new java.sql.Date(endTime.getTime()));
     }
 
     @Override
-    public Page<DeployDO> pageDeployFrequencyDetail(Long projectId, PageRequest pageRequest, Long[] envIds, Long appId, Date startTime, Date endTime) {
+    public Page<DeployDO> pageDeployFrequencyDetail(Long projectId, PageRequest pageRequest, Long[] envIds, Long appId,
+                                                    Date startTime, Date endTime) {
         return PageHelper.doPageAndSort(pageRequest, () ->
                 applicationInstanceMapper
-                        .listDeployFrequency(projectId, envIds, appId, new java.sql.Date(startTime.getTime()), new java.sql.Date(endTime.getTime())));
+                        .listDeployFrequency(projectId, envIds, appId, new java.sql.Date(startTime.getTime()),
+                                new java.sql.Date(endTime.getTime())));
     }
 
     @Override
-    public Page<DeployDO> pageDeployTimeDetail(Long projectId, PageRequest pageRequest, Long envId, Long[] appIds, Date startTime, Date endTime) {
+    public Page<DeployDO> pageDeployTimeDetail(Long projectId, PageRequest pageRequest, Long envId, Long[] appIds,
+                                               Date startTime, Date endTime) {
         return PageHelper.doPageAndSort(pageRequest, () ->
                 applicationInstanceMapper
-                        .listDeployTime(projectId, envId, appIds, new java.sql.Date(startTime.getTime()), new java.sql.Date(endTime.getTime())));
+                        .listDeployTime(projectId, envId, appIds, new java.sql.Date(startTime.getTime()),
+                                new java.sql.Date(endTime.getTime())));
+    }
+
+    @Override
+    public List<ApplicationInstanceE> listByAppId(Long appId) {
+        ApplicationInstanceDO applicationInstanceDO = new ApplicationInstanceDO();
+        applicationInstanceDO.setAppId(appId);
+        return ConvertHelper
+                .convertList(applicationInstanceMapper.select(applicationInstanceDO), ApplicationInstanceE.class);
+    }
+
+    @Override
+    public void deleteAppInstanceByEnvId(Long envId) {
+        ApplicationInstanceDO applicationInstanceDO = new ApplicationInstanceDO();
+        applicationInstanceDO.setEnvId(envId);
+        applicationInstanceMapper.delete(applicationInstanceDO);
     }
 }

@@ -54,7 +54,7 @@ public class HandlerC7nCertificationServiceImpl implements HandlerObjectFileRela
                                  List<C7nCertification> c7nCertifications, Long envId, Long projectId, String path, Long userId) {
         //todo command操作
         List<C7nCertification> updateC7nCertification = new ArrayList<>();
-        List<String> beforeC7nCertification = beforeSync.parallelStream()
+        List<String> beforeC7nCertification = beforeSync.stream()
                 .filter(devopsEnvFileResourceE -> devopsEnvFileResourceE.getResourceType().equals(CERTIFICATE))
                 .map(devopsEnvFileResourceE -> {
                     CertificationE certificationE = certificationRepository
@@ -62,14 +62,14 @@ public class HandlerC7nCertificationServiceImpl implements HandlerObjectFileRela
                     if (certificationE == null) {
                         devopsEnvFileResourceRepository
                                 .deleteByEnvIdAndResource(envId, devopsEnvFileResourceE.getResourceId(), ObjectType.CERTIFICATE.getType());
-                      return null;
+                        return null;
                     }
                     return certificationE.getName();
                 })
                 .collect(Collectors.toList());
 
         List<C7nCertification> addC7nCertification = new ArrayList<>();
-        c7nCertifications.parallelStream()
+        c7nCertifications.stream()
                 .forEach(certification -> {
                     int index = beforeC7nCertification.indexOf(certification.getMetadata().getName());
                     if (index != -1) {
@@ -93,7 +93,7 @@ public class HandlerC7nCertificationServiceImpl implements HandlerObjectFileRela
                     devopsEnvFileResourceRepository
                             .deleteByEnvIdAndResource(envId, certificationE.getId(), ObjectType.CERTIFICATE.getType());
                 });
-        addC7nCertification.parallelStream().forEach(c7nCertification -> {
+        addC7nCertification.stream().forEach(c7nCertification -> {
             String filePath = "";
             try {
                 filePath = objectPath.get(TypeUtil.objToString(c7nCertification.hashCode()));
@@ -171,8 +171,8 @@ public class HandlerC7nCertificationServiceImpl implements HandlerObjectFileRela
             certificationE = certificationRepository.create(certificationE);
             CertificationExistCert existCert = c7nCertification.getSpec().getExistCert();
             if (existCert != null) {
-                certificationRepository.storeCertFile(
-                        new CertificationFileDO(certificationE.getId(), existCert.getCert(), existCert.getKey()));
+                certificationE.setCertificationFileId(certificationRepository.storeCertFile(
+                        new CertificationFileDO(existCert.getCert(), existCert.getKey())));
             }
             Long commandId = certificationService
                     .createCertCommandE(CommandType.CREATE.getType(), certificationE.getId(), userId);

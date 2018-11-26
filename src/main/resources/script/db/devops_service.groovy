@@ -74,4 +74,11 @@ databaseChangeLog(logicalFilePath: 'dba/devops_service.groovy') {
                     column(name: 'command_id', type: 'BIGINT UNSIGNED', remarks: 'command id', afterColumn: 'env_id')
                 }
             }
+
+
+    changeSet(id: '2018-10-08-drop-column', author: 'younger') {
+        dropUniqueConstraint(constraintName: "devops_service_uk_namespace_name",tableName: "devops_service")
+        dropColumn(columnName: "namespace", tableName: "devops_service")
+
+    }
 }

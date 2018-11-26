@@ -1,21 +1,29 @@
 package io.choerodon.devops.api.controller.v1
 
+import io.choerodon.core.domain.Page
 import io.choerodon.devops.IntegrationTestConfiguration
 import io.choerodon.devops.domain.application.entity.ProjectE
+import io.choerodon.devops.domain.application.entity.UserAttrE
 import io.choerodon.devops.domain.application.repository.IamRepository
 import io.choerodon.devops.domain.application.valueobject.Organization
 import io.choerodon.devops.infra.dataobject.DevopsEnvFileErrorDO
 import io.choerodon.devops.infra.dataobject.DevopsEnvironmentDO
+import io.choerodon.devops.infra.dataobject.iam.OrganizationDO
+import io.choerodon.devops.infra.dataobject.iam.ProjectDO
+import io.choerodon.devops.infra.feign.IamServiceClient
 import io.choerodon.devops.infra.mapper.DevopsEnvFileErrorMapper
 import io.choerodon.devops.infra.mapper.DevopsEnvironmentMapper
-import io.choerodon.mybatis.pagehelper.domain.PageRequest
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
+import spock.lang.Subject
 
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 
@@ -25,13 +33,11 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  * Time: 14:54
  * Description: 
  */
-
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Import(IntegrationTestConfiguration)
+@Subject(DevopsEnvFileErrorController)
 @Stepwise
 class DevopsEnvFileErrorControllerSpec extends Specification {
-
-    private static flag = 0
 
     @Autowired
     private TestRestTemplate restTemplate
@@ -41,67 +47,83 @@ class DevopsEnvFileErrorControllerSpec extends Specification {
     private DevopsEnvFileErrorMapper devopsEnvFileErrorMapper
 
     @Autowired
-    @Qualifier("mockIamRepository")
     private IamRepository iamRepository
 
+    IamServiceClient iamServiceClient = Mockito.mock(IamServiceClient.class)
+
+    @Shared
+    Long init_id = 1L
+    @Shared
+    Long project_id = 1L
+    @Shared
+    ProjectE projectE = new ProjectE()
+    @Shared
+    UserAttrE userAttrE = new UserAttrE()
+    @Shared
+    Organization organization = new Organization()
+
     def setup() {
-        if (flag == 0) {
-            DevopsEnvFileErrorDO devopsEnvFileErrorDO = new DevopsEnvFileErrorDO()
-            devopsEnvFileErrorDO.setEnvId(1L)
-            DevopsEnvFileErrorDO devopsEnvFileErrorDO1 = new DevopsEnvFileErrorDO()
-            devopsEnvFileErrorDO1.setEnvId(1L)
-            devopsEnvFileErrorMapper.insert(devopsEnvFileErrorDO)
-            devopsEnvFileErrorMapper.insert(devopsEnvFileErrorDO1)
+        iamRepository.initMockIamService(iamServiceClient)
 
-            DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO()
-            devopsEnvironmentDO.setDevopsEnvGroupId(1L)
-            devopsEnvironmentDO.setProjectId(1)
-            devopsEnvironmentDO.setCode("ecode")
-            devopsEnvironmentMapper.insert(devopsEnvironmentDO)
+        ProjectDO projectDO = new ProjectDO()
+        projectDO.setId(1L)
+        projectDO.setCode("pro")
+        projectDO.setOrganizationId(1L)
+        ResponseEntity<ProjectDO> responseEntity = new ResponseEntity<>(projectDO, HttpStatus.OK)
+        Mockito.doReturn(responseEntity).when(iamServiceClient).queryIamProject(1L)
 
-            flag = 1
-        }
+        OrganizationDO organizationDO = new OrganizationDO()
+        organizationDO.setId(1L)
+        organizationDO.setCode("org")
+        ResponseEntity<OrganizationDO> responseEntity1 = new ResponseEntity<>(organizationDO, HttpStatus.OK)
+        Mockito.doReturn(responseEntity1).when(iamServiceClient).queryOrganizationById(1L)
     }
 
     def "List"() {
-        given:
-        Organization organization = new Organization()
-        organization.setId(1L)
-        organization.setCode("ocode")
+        given: '插入数据'
+        DevopsEnvFileErrorDO devopsEnvFileErrorDO = new DevopsEnvFileErrorDO()
+        devopsEnvFileErrorDO.setId(1L)
+        devopsEnvFileErrorDO.setEnvId(1L)
+        devopsEnvFileErrorMapper.insert(devopsEnvFileErrorDO)
+        DevopsEnvFileErrorDO devopsEnvFileErrorDO1 = new DevopsEnvFileErrorDO()
+        devopsEnvFileErrorDO.setId(2L)
+        devopsEnvFileErrorDO1.setEnvId(1L)
+        devopsEnvFileErrorMapper.insert(devopsEnvFileErrorDO1)
 
-        ProjectE projectE = new ProjectE()
-        projectE.setId(1L)
-        projectE.setCode("pcode")
-        projectE.setOrganization(organization)
+        DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO()
+        devopsEnvironmentDO.setId(1L)
+        devopsEnvironmentDO.setCode("env")
+        devopsEnvironmentDO.setProjectId(1)
+        devopsEnvironmentDO.setDevopsEnvGroupId(1L)
+        devopsEnvironmentMapper.insert(devopsEnvironmentDO)
 
-        when:
+        when: '项目下查询环境文件错误列表'
         def list = restTemplate.getForObject("/v1/projects/1/envs/1/error_file/list", List.class)
 
-        then:
-        iamRepository.queryIamProject(_ as Long) >> projectE
-        iamRepository.queryOrganizationById(_ as Long) >> organization
-        !list.isEmpty()
+        then: '校验返回结果'
+        list.size() == 2
     }
 
     def "Page"() {
-        given:
-        PageRequest pageRequest = new PageRequest(1, 20)
+        when: '项目下查询环境文件错误列表'
+        def page = restTemplate.getForObject("/v1/projects/1/envs/1/error_file/list_by_page", Page.class)
 
-        Organization organization = new Organization()
-        organization.setId(1L)
-        organization.setCode("ocode")
+        then: '校验返回结果'
+        page.size() == 2
 
-        ProjectE projectE = new ProjectE()
-        projectE.setId(1L)
-        projectE.setCode("pcode")
-        projectE.setOrganization(organization)
-
-        when:
-        def page = restTemplate.getForObject("/v1/projects/1/envs/1/error_file/list_by_page", Object.class)
-
-        then:
-        iamRepository.queryIamProject(_ as Long) >> projectE
-        iamRepository.queryOrganizationById(_ as Long) >> organization
-        page != null
+        // 删除env
+        List<DevopsEnvironmentDO> list = devopsEnvironmentMapper.selectAll()
+        if (list != null && !list.isEmpty()) {
+            for (DevopsEnvironmentDO e : list) {
+                devopsEnvironmentMapper.delete(e)
+            }
+        }
+        // 删除envFileError
+        List<DevopsEnvFileErrorDO> list1 = devopsEnvFileErrorMapper.selectAll()
+        if (list1 != null && !list1.isEmpty()) {
+            for (DevopsEnvFileErrorDO e : list1) {
+                devopsEnvFileErrorMapper.delete(e)
+            }
+        }
     }
 }

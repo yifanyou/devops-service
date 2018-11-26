@@ -63,7 +63,7 @@ public class ApplicationController {
      * @return ApplicationRepDTO
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER,InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "项目下查询单个应用信息")
     @GetMapping("/{applicationId}/detail")
     public ResponseEntity<ApplicationRepDTO> queryByAppId(
@@ -136,7 +136,7 @@ public class ApplicationController {
             @PathVariable(value = "project_id") Long projectId,
             @ApiParam(value = "应用id", required = true)
             @PathVariable Long applicationId) {
-        applicationService.delete(projectId,applicationId);
+        applicationService.delete(projectId, applicationId);
         return new ResponseEntity(HttpStatus.NO_CONTENT);
     }
 
@@ -151,8 +151,7 @@ public class ApplicationController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "项目下分页查询应用")
     @CustomPageRequest
     @PostMapping("/list_by_options")
@@ -181,8 +180,7 @@ public class ApplicationController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "根据环境id分页获取已部署正在运行实例的应用")
     @CustomPageRequest
     @GetMapping("/pages")
@@ -208,8 +206,7 @@ public class ApplicationController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "根据环境id获取已部署正在运行实例的应用")
     @GetMapping("/options")
     public ResponseEntity<List<ApplicationCodeDTO>> listByEnvIdAndStatus(
@@ -217,9 +214,11 @@ public class ApplicationController {
             @PathVariable(value = "project_id") Long projectId,
             @ApiParam(value = "环境 ID", required = true)
             @RequestParam Long envId,
-            @ApiParam(value = "实例运行状态", required = true)
-            @RequestParam String status) {
-        return Optional.ofNullable(applicationService.listByEnvId(projectId, envId, status))
+            @ApiParam(value = "实例运行状态")
+            @RequestParam(required = false) String status,
+            @ApiParam(value = "应用 Id")
+            @RequestParam(required = false) Long appId) {
+        return Optional.ofNullable(applicationService.listByEnvId(projectId, envId, status, appId))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException("error.appName.query"));
     }
@@ -232,8 +231,7 @@ public class ApplicationController {
      */
     @Permission(level = ResourceLevel.PROJECT, roles = {
             InitRoleCode.PROJECT_OWNER,
-            InitRoleCode.PROJECT_MEMBER,
-            InitRoleCode.DEPLOY_ADMINISTRATOR
+            InitRoleCode.PROJECT_MEMBER
     })
     @ApiOperation(value = "项目下查询所有已经启用的应用")
     @GetMapping
@@ -247,17 +245,16 @@ public class ApplicationController {
 
 
     /**
-     * 项目下查询所有可选已经启用的应用
+     * 本项目下或者应用市场在该项目下部署过的应用
      *
      * @param projectId 项目id
      * @return list of ApplicationRepDTO
      */
     @Permission(level = ResourceLevel.PROJECT, roles = {
             InitRoleCode.PROJECT_OWNER,
-            InitRoleCode.PROJECT_MEMBER,
-            InitRoleCode.DEPLOY_ADMINISTRATOR
+            InitRoleCode.PROJECT_MEMBER
     })
-    @ApiOperation(value = "项目下查询所有已经启用的应用")
+    @ApiOperation(value = "本项目下或者应用市场在该项目下部署过的应用")
     @GetMapping(value = "/list_all")
     public ResponseEntity<List<ApplicationRepDTO>> listAll(
             @ApiParam(value = "项目 ID", required = true)

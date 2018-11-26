@@ -2,12 +2,11 @@ package io.choerodon.devops
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.choerodon.core.oauth.CustomUserDetails
-import io.choerodon.devops.domain.application.repository.*
-import io.choerodon.devops.domain.service.DeployService
 import io.choerodon.devops.infra.common.util.EnvUtil
 import io.choerodon.devops.infra.common.util.GitUtil
 import io.choerodon.liquibase.LiquibaseConfig
 import io.choerodon.liquibase.LiquibaseExecutor
+import io.choerodon.websocket.helper.CommandSender
 import io.choerodon.websocket.helper.EnvListener
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -16,11 +15,14 @@ import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.core.annotation.Order
 import org.springframework.http.HttpRequest
 import org.springframework.http.client.ClientHttpRequestExecution
 import org.springframework.http.client.ClientHttpRequestInterceptor
 import org.springframework.http.client.ClientHttpResponse
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter
 import org.springframework.security.jwt.JwtHelper
 import org.springframework.security.jwt.crypto.sign.MacSigner
 import org.springframework.security.jwt.crypto.sign.Signer
@@ -28,19 +30,32 @@ import org.springframework.test.context.TestPropertySource
 import spock.mock.DetachedMockFactory
 
 import javax.annotation.PostConstruct
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.Statement
 
 /**
  * Created by hailuoliu@choerodon.io on 2018/7/13.
  */
 @TestConfiguration
 @Import(LiquibaseConfig)
+@Order(1)
 @TestPropertySource("classpath:application-test.yml")
-class IntegrationTestConfiguration {
+class IntegrationTestConfiguration extends WebSecurityConfigurerAdapter {
 
     private final detachedMockFactory = new DetachedMockFactory()
 
     @Value('${choerodon.oauth.jwt.key:choerodon}')
     String key
+
+    @Value('${spring.datasource.url}')
+    String dataBaseUrl
+
+    @Value('${spring.datasource.username}')
+    String dataBaseUsername
+
+    @Value('${spring.datasource.password}')
+    String dataBasePassword
 
     @Autowired
     TestRestTemplate testRestTemplate
@@ -49,24 +64,6 @@ class IntegrationTestConfiguration {
     LiquibaseExecutor liquibaseExecutor
 
     final ObjectMapper objectMapper = new ObjectMapper()
-
-    @Bean("mockGitlabRepository")
-    @Primary
-    GitlabRepository gitlabRepository() {
-        detachedMockFactory.Mock(GitlabRepository)
-    }
-
-    @Bean("mockUserAttrRepository")
-    @Primary
-    UserAttrRepository userAttrRepository() {
-        detachedMockFactory.Mock(UserAttrRepository)
-    }
-
-    @Bean("mockGitlabGroupMemberRepository")
-    @Primary
-    GitlabGroupMemberRepository gitlabGroupMemberRepository() {
-        detachedMockFactory.Mock(GitlabGroupMemberRepository)
-    }
 
     @Primary
     @Bean("mockEnvUtil")
@@ -80,34 +77,35 @@ class IntegrationTestConfiguration {
         detachedMockFactory.Mock(EnvListener)
     }
 
-    @Bean("mockIamRepository")
-    @Primary
-    IamRepository iamRepository() {
-        detachedMockFactory.Mock(IamRepository)
-    }
-
     @Bean("mockGitUtil")
     @Primary
     GitUtil gitUtil() {
         detachedMockFactory.Mock(GitUtil)
     }
 
-    @Bean("mockDevopsGitRepository")
+    @Bean("mockCommandSender")
     @Primary
-    DevopsGitRepository devopsGitRepository() {
-        detachedMockFactory.Mock(DevopsGitRepository)
-    }
-
-    @Bean("mockDeployService")
-    @Primary
-    DeployService deployService() {
-        detachedMockFactory.Mock(DeployService)
+    CommandSender commandSender() {
+        detachedMockFactory.Mock(CommandSender)
     }
 
     @PostConstruct
     void init() {
         liquibaseExecutor.execute(new String()[])
+        initSqlFunction()
         setTestRestTemplateJWT()
+    }
+
+    void initSqlFunction() {
+        //连接H2数据库
+        Class.forName("org.h2.Driver")
+        Connection conn = DriverManager.
+                getConnection(dataBaseUrl, dataBaseUsername, dataBasePassword)
+        Statement stat = conn.createStatement()
+        //创建 SQL的IF函数，用JAVA的方法代替函数
+        stat.execute("CREATE ALIAS IF NOT EXISTS BINARY FOR \"io.choerodon.devops.infra.common.util.MybatisFunctionTestUtil.binaryFunction\"")
+        stat.close()
+        conn.close()
     }
 
     private void setTestRestTemplateJWT() {
@@ -136,6 +134,18 @@ class IntegrationTestConfiguration {
             e.printStackTrace()
         }
         return jwtToken
+    }
+
+    /**
+     * 解决访问h2-console跨域问题
+     * @param http
+     * @throws Exception
+     */
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.csrf().ignoringAntMatchers("/h2-console/**")
+                .and()
+                .headers().frameOptions().disable()
     }
 }
 

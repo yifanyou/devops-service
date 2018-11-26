@@ -1,5 +1,6 @@
 package io.choerodon.devops.domain.application.repository;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -13,13 +14,13 @@ public interface DevopsGitlabCommitRepository {
 
     DevopsGitlabCommitE create(DevopsGitlabCommitE devopsGitlabCommitE);
 
-    DevopsGitlabCommitE queryBySha(String sha);
+    DevopsGitlabCommitE queryByShaAndRef(String sha, String ref);
 
-    List<DevopsGitlabCommitE> listCommits(Long projectId, List<Long> appIds, String startDate, String endDate);
+    List<DevopsGitlabCommitE> listCommits(Long projectId, List<Long> appIds, Date startDate, Date endDate);
 
     Page<CommitFormRecordDTO> pageCommitRecord(Long projectId, List<Long> appId,
                                                PageRequest pageRequest, Map<Long, UserE> userMap,
-                                               String startDate, String endDate);
+                                               Date startDate, Date endDate);
 
     void update(DevopsGitlabCommitE devopsGitlabCommitE);
 

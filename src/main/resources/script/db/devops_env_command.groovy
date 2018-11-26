@@ -26,4 +26,17 @@ databaseChangeLog(logicalFilePath: 'dba/devops_env_command.groovy') {
                     column(name: 'sha', type: 'VARCHAR(128)', remarks: 'commit sha', afterColumn: 'status')
                 }
             }
+
+
+    changeSet(author: 'younger', id: '2018-10-23-add-column')
+            {
+                addColumn(tableName: 'devops_env_command') {
+                    column(name: 'object_version_id', type: 'BIGINT UNSIGNED', remarks: 'object version id', afterColumn: 'object_id')
+                }
+
+            }
+
+    changeSet(author: 'younger', id: '2018-10-25-update-data') {
+                sql("update devops_app_instance A,devops_env_command B set B.object_version_id=A.app_version_id where A.command_id=B.id")
+            }
 }

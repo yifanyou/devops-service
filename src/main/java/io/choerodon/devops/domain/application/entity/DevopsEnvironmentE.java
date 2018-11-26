@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class DevopsEnvironmentE {
     private Long id;
     private ProjectE projectE;
+    private DevopsClusterE clusterE;
     private Long gitlabEnvProjectId;
     private Long devopsEnvGroupId;
     private Long hookId;
@@ -27,12 +28,11 @@ public class DevopsEnvironmentE {
     private String description;
     private Boolean isConnected;
     private Boolean isActive;
-    private Boolean isUpdate;
-    private String updateMessage;
+    private Boolean permission;
 
     private Long devopsSyncCommit;
     private Long agentSyncCommit;
-    private Long gitCommit;
+    private Long sagaSyncCommit;
 
     /**
      * 重写构造方法
@@ -145,22 +145,6 @@ public class DevopsEnvironmentE {
 
     }
 
-    public Boolean getUpdate() {
-        return isUpdate;
-    }
-
-    public void setUpdate(Boolean update) {
-        isUpdate = update;
-    }
-
-    public String getUpdateMessage() {
-        return updateMessage;
-    }
-
-    public void setUpdateMessage(String updateMessage) {
-        this.updateMessage = updateMessage;
-    }
-
     public Long getSequence() {
         return sequence;
     }
@@ -242,15 +226,21 @@ public class DevopsEnvironmentE {
         this.agentSyncCommit = agentSyncCommit;
     }
 
-
-    public Long getGitCommit() {
-        return gitCommit;
+    public Boolean getConnected() {
+        return isConnected;
     }
 
-    public void setGitCommit(Long gitCommit) {
-        this.gitCommit = gitCommit;
+    public void setConnected(Boolean connected) {
+        isConnected = connected;
     }
 
+    public Long getSagaSyncCommit() {
+        return sagaSyncCommit;
+    }
+
+    public void setSagaSyncCommit(Long sagaSyncCommit) {
+        this.sagaSyncCommit = sagaSyncCommit;
+    }
 
     public Long getDevopsEnvGroupId() {
         return devopsEnvGroupId;
@@ -260,6 +250,22 @@ public class DevopsEnvironmentE {
         this.devopsEnvGroupId = devopsEnvGroupId;
     }
 
+    public Boolean getPermission() {
+        return permission;
+    }
+
+    public void setPermission(Boolean permission) {
+        this.permission = permission;
+    }
+
+    public DevopsClusterE getClusterE() {
+        return clusterE;
+    }
+
+    public void initDevopsClusterEById(Long id) {
+        this.clusterE = new DevopsClusterE(id);
+    }
+
     /**
      * 初始化序列
      */
@@ -267,7 +273,7 @@ public class DevopsEnvironmentE {
         this.sequence = 1L;
         if (!devopsEnvironmentES.isEmpty()) {
             LongSummaryStatistics stats = devopsEnvironmentES
-                    .parallelStream()
+                    .stream()
                     .mapToLong(DevopsEnvironmentE::getSequence)
                     .summaryStatistics();
             this.sequence = stats.getMax() + 1;

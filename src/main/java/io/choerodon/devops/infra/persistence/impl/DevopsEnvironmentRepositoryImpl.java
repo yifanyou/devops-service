@@ -67,7 +67,7 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
     @Override
     public void checkName(DevopsEnvironmentE devopsEnvironmentE) {
         DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
-        devopsEnvironmentDO.setProjectId(devopsEnvironmentE.getProjectE().getId());
+        devopsEnvironmentDO.setClusterId(devopsEnvironmentE.getClusterE().getId());
         devopsEnvironmentDO.setName(devopsEnvironmentE.getName());
         if (!devopsEnvironmentMapper.select(devopsEnvironmentDO).isEmpty()) {
             throw new CommonException("error.name.exist");
@@ -77,7 +77,7 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
     @Override
     public void checkCode(DevopsEnvironmentE devopsEnvironmentE) {
         DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
-        devopsEnvironmentDO.setProjectId(devopsEnvironmentE.getProjectE().getId());
+        devopsEnvironmentDO.setClusterId(devopsEnvironmentE.getClusterE().getId());
         devopsEnvironmentDO.setCode(devopsEnvironmentE.getCode());
         if (!devopsEnvironmentMapper.select(devopsEnvironmentDO).isEmpty()) {
             throw new CommonException("error.code.exist");
@@ -92,7 +92,6 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
         return ConvertHelper.convertList(devopsEnvironmentDOS, DevopsEnvironmentE.class);
     }
 
-
     @Override
     public List<DevopsEnvironmentE> queryByprojectAndActive(Long projectId, Boolean active) {
         DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
@@ -103,19 +102,16 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
     }
 
     @Override
-    public DevopsEnvironmentE queryByProjectIdAndCode(Long projectId, String code) {
+    public DevopsEnvironmentE queryByClusterIdAndCode(Long clusterId, String code) {
         DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
-        devopsEnvironmentDO.setProjectId(projectId);
+        devopsEnvironmentDO.setClusterId(clusterId);
         devopsEnvironmentDO.setCode(code);
         return ConvertHelper.convert(devopsEnvironmentMapper.selectOne(devopsEnvironmentDO), DevopsEnvironmentE.class);
     }
 
     @Override
     public DevopsEnvironmentE queryByToken(String token) {
-        DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
-        devopsEnvironmentDO.setToken(token);
-        devopsEnvironmentMapper.selectOne(devopsEnvironmentDO);
-        return ConvertHelper.convert(devopsEnvironmentMapper.selectOne(devopsEnvironmentDO), DevopsEnvironmentE.class);
+        return ConvertHelper.convert(devopsEnvironmentMapper.queryByToken(token), DevopsEnvironmentE.class);
     }
 
     @Override
@@ -125,6 +121,21 @@ public class DevopsEnvironmentRepositoryImpl implements DevopsEnvironmentReposit
 
     @Override
     public void updateEnvCommit(DevopsEnvironmentE devopsEnvironmentE) {
-        devopsEnvironmentMapper.updateDevopsEnvCommit(devopsEnvironmentE.getId(), devopsEnvironmentE.getGitCommit(), devopsEnvironmentE.getDevopsSyncCommit(), devopsEnvironmentE.getAgentSyncCommit());
+        devopsEnvironmentMapper.updateDevopsEnvCommit(devopsEnvironmentE.getId(),
+                devopsEnvironmentE.getSagaSyncCommit(), devopsEnvironmentE.getDevopsSyncCommit(),
+                devopsEnvironmentE.getAgentSyncCommit());
     }
+
+    @Override
+    public void deleteById(Long id) {
+        devopsEnvironmentMapper.deleteByPrimaryKey(id);
+    }
+
+    @Override
+    public List<DevopsEnvironmentE> listByClusterId(Long clusterId) {
+        DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO();
+        devopsEnvironmentDO.setClusterId(clusterId);
+        return ConvertHelper.convertList(devopsEnvironmentMapper.select(devopsEnvironmentDO), DevopsEnvironmentE.class);
+    }
+
 }

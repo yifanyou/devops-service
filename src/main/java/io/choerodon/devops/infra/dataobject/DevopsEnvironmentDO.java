@@ -19,6 +19,7 @@ public class DevopsEnvironmentDO extends AuditDomain {
     @GeneratedValue
     private Long id;
     private Long projectId;
+    private Long clusterId;
     private Long gitlabEnvProjectId;
     private Long hookId;
     private String envIdRsa;
@@ -31,7 +32,7 @@ public class DevopsEnvironmentDO extends AuditDomain {
     private Boolean isConnected;
     private Boolean isActive;
     private Long devopsEnvGroupId;
-    private Long gitCommit;
+    private Long sagaSyncCommit;
     private Long devopsSyncCommit;
     private Long agentSyncCommit;
 
@@ -140,12 +141,13 @@ public class DevopsEnvironmentDO extends AuditDomain {
         this.hookId = hookId;
     }
 
-    public Long getGitCommit() {
-        return gitCommit;
+
+    public Long getSagaSyncCommit() {
+        return sagaSyncCommit;
     }
 
-    public void setGitCommit(Long gitCommit) {
-        this.gitCommit = gitCommit;
+    public void setSagaSyncCommit(Long sagaSyncCommit) {
+        this.sagaSyncCommit = sagaSyncCommit;
     }
 
     public Long getDevopsSyncCommit() {
@@ -170,5 +172,13 @@ public class DevopsEnvironmentDO extends AuditDomain {
 
     public void setDevopsEnvGroupId(Long devopsEnvGroupId) {
         this.devopsEnvGroupId = devopsEnvGroupId;
+    }
+
+    public Long getClusterId() {
+        return clusterId;
+    }
+
+    public void setClusterId(Long clusterId) {
+        this.clusterId = clusterId;
     }
 }

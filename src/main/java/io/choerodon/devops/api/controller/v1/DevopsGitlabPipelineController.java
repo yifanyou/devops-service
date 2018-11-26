@@ -42,8 +42,7 @@ public class DevopsGitlabPipelineController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取pipeline时长报表")
     @GetMapping(value = "/time")
     public ResponseEntity<PipelineTimeDTO> listPipelineTime(
@@ -68,12 +67,11 @@ public class DevopsGitlabPipelineController {
      * @param appId     应用id
      * @param startTime 开始时间
      * @param endTime   结束时间
-     * @return List
+     * @return
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取pipeline次数报表")
     @GetMapping(value = "/frequency")
     public ResponseEntity<PipelineFrequencyDTO> listPipelineFrequency(
@@ -102,8 +100,7 @@ public class DevopsGitlabPipelineController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "分页获取pipeline")
     @CustomPageRequest
     @GetMapping(value = "/page")
