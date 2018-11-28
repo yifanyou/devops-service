@@ -42,7 +42,7 @@ public class ApplicationServiceExImpl implements ApplicationServiceEx {
     @Override
     public Page<ApplicationRepDTO> listByOptionsInOrg(Long orgId, Boolean isActive, Boolean hasVersion, PageRequest pageRequest, String params) {
 
-        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(orgId);
+        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(orgId, null);
         Map<Long, ProjectE> projectMapping = projectEList.stream().collect(Collectors.toMap(ProjectE::getId, x -> x));
         Page<ApplicationE> applicationES =
                 applicationRepositoryEx.listByOptionsAndProjectIds(projectEList.stream()
