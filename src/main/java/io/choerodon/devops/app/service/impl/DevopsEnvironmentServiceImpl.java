@@ -190,7 +190,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
              * get org info
              */
 
-            EnvApplicationDomain domain = assembleEnvDomain("申请环境"
+            EnvApplicationDomain domain = assembleEnvDomain("新建环境"
                     , organization
                     , projectE
                     , GitUserNameUtil.getUsername()
@@ -201,7 +201,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                     , devopsEnviromentDTO.getPartition()
                     , cmd
             );
-            robotChannel.sendMessageToAll("申请环境", domain);
+            robotChannel.sendMessageToAll("申请新建环境", domain);
             return cmd;
         } catch (JsonProcessingException e) {
             throw new CommonException(e.getMessage());
@@ -289,7 +289,6 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
 
         domain.setUserInfo(usrSb);
         domain.setType(type);
-
         domain.setEnvName(envName);
         domain.setEnvDesc(envDesc);
         domain.setPartition(partition);
@@ -490,7 +489,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
         EnvApplicationDomain domain;
 
         if(update) {
-            domain = assembleEnvDomain("申请升级环境"
+            domain = assembleEnvDomain("升级环境"
                     , organization
                     , projectE
                     , GitUserNameUtil.getUsername()
@@ -503,7 +502,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
             );
             robotChannel.sendMessageToAll("申请升级环境", domain);
         }else{
-            domain = assembleEnvDomain("申请重启环境"
+            domain = assembleEnvDomain("重连环境"
                     , organization
                     , projectE
                     , GitUserNameUtil.getUsername()
@@ -514,7 +513,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
                     , extractPartition(devopsEnvironmentE.getCode())
                     , cmd
             );
-            robotChannel.sendMessageToAll("申请重启环境", domain);
+            robotChannel.sendMessageToAll("申请重连环境", domain);
         }
         return cmd;
     }
