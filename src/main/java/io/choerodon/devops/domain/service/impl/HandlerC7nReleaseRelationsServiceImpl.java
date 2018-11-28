@@ -48,6 +48,8 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
     private ApplicationVersionRepository applicationVersionRepository;
     @Autowired
     private DevopsEnvFileResourceService devopsEnvFileResourceService;
+    @Autowired
+    private ApplicationRepository applicationRepository;
 
     @Override
     public void handlerRelations(Map<String, String> objectPath, List<DevopsEnvFileResourceE> beforeSync, List<C7nHelmRelease> c7nHelmReleases, Long envId, Long projectId, String path, Long userId) {
@@ -213,6 +215,14 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
         }
         ApplicationVersionE applicationVersionE = applicationVersionRepository
                 .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+        if(applicationVersionE == null) {
+            ApplicationInstanceE applicationInstanceE = applicationInstanceRepository.selectByCode(c7nHelmRelease.getMetadata().getName(), envId);
+            if(applicationInstanceE != null) {
+                applicationE = applicationRepository.query(applicationInstanceE.getApplicationE().getId());
+                applicationVersionE = applicationVersionRepository
+                        .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+            }
+        }
         if (applicationVersionE == null) {
             throw new GitOpsExplainException("appversion.not.exist.in.database", filePath, c7nHelmRelease.getSpec().getChartVersion(), null);
         }
