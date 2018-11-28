@@ -22,7 +22,7 @@ public class DingTalkConfig {
     }
 
     @Bean("PaasChannel")
-    public RobotChannel paasChannel(RobotApi robotApi, @Value("${xplat.social.ding-talk.paasToken}") String paasToken){
+    public RobotChannel paasChannel(RobotApi robotApi, @Value("${xplat.social.dingtalk.paasToken}") String paasToken){
         return new PaasChannel(robotApi, paasToken);
     }
 }
