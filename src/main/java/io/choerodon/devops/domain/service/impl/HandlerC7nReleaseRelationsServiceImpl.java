@@ -219,8 +219,10 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
             ApplicationInstanceE applicationInstanceE = applicationInstanceRepository.selectByCode(c7nHelmRelease.getMetadata().getName(), envId);
             if(applicationInstanceE != null) {
                 applicationE = applicationRepository.query(applicationInstanceE.getApplicationE().getId());
-                applicationVersionE = applicationVersionRepository
-                        .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+                if(applicationE != null) {
+                    applicationVersionE = applicationVersionRepository
+                            .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+                }
             }
         }
         if (applicationVersionE == null) {
