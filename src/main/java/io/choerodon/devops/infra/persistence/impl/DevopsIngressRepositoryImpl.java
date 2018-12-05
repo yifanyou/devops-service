@@ -325,7 +325,7 @@ public class DevopsIngressRepositoryImpl implements DevopsIngressRepository {
     private void getDevopsIngressDTO(DevopsIngressDTO devopsIngressDTO, DevopsIngressPathDO e) {
         DevopsServiceE devopsServiceE = devopsServiceRepository.query(e.getServiceId());
         DevopsIngressPathDTO devopsIngressPathDTO = new DevopsIngressPathDTO(
-                e.getPath(), e.getServiceId(), e.getServiceName(),
+                e.getPath(), e.getRewritePath(), e.getServiceId(), e.getServiceName(),
                 devopsServiceE == null ? ServiceStatus.DELETED.getStatus() : devopsServiceE.getStatus());
         devopsIngressPathDTO.setServicePort(e.getServicePort());
         devopsIngressDTO.addDevopsIngressPathDTO(devopsIngressPathDTO);

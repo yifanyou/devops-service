@@ -15,6 +15,7 @@ public class DevopsIngressPathDTO {
     private String serviceName;
     private String serviceStatus;
     private Long servicePort;
+    private String rewritePath;
 
     public DevopsIngressPathDTO() {
     }
@@ -24,6 +25,17 @@ public class DevopsIngressPathDTO {
      */
     public DevopsIngressPathDTO(String path, Long serviceId, String serviceName, String serviceStatus) {
         this.path = path;
+        this.serviceId = serviceId;
+        this.serviceName = serviceName;
+        this.serviceStatus = serviceStatus;
+    }
+
+    /**
+     * 构造函数
+     */
+    public DevopsIngressPathDTO(String path, String rewritePath, Long serviceId, String serviceName, String serviceStatus) {
+        this.path = path;
+        this.rewritePath = rewritePath;
         this.serviceId = serviceId;
         this.serviceName = serviceName;
         this.serviceStatus = serviceStatus;
@@ -67,6 +79,14 @@ public class DevopsIngressPathDTO {
 
     public void setServicePort(Long servicePort) {
         this.servicePort = servicePort;
+    }
+
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
     }
 
     @Override
