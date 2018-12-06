@@ -33,13 +33,13 @@ public class DevopsClusterRepositoryImpl implements DevopsClusterRepository {
     @Override
     public DevopsClusterE create(DevopsClusterE devopsClusterE) {
         DevopsClusterDO devopsClusterDO = ConvertHelper.convert(devopsClusterE, DevopsClusterDO.class);
-        List<DevopsClusterDO> devopsClusterDOS = devopsClusterMapper.selectAll();
+//        List<DevopsClusterDO> devopsClusterDOS = devopsClusterMapper.selectAll();
         String choerodonId = GenerateUUID.generateUUID().split("-")[0];
-        if (!devopsClusterDOS.isEmpty()) {
-            devopsClusterDO.setChoerodonId(devopsClusterDOS.get(0).getChoerodonId());
-        } else {
-            devopsClusterDO.setChoerodonId(choerodonId);
-        }
+//        if (!devopsClusterDOS.isEmpty()) {
+//            devopsClusterDO.setChoerodonId(devopsClusterDOS.get(0).getChoerodonId());
+//        } else {
+        devopsClusterDO.setChoerodonId(choerodonId);
+//        }
         if (devopsClusterMapper.insert(devopsClusterDO) != 1) {
             throw new CommonException("error.devops.cluster.insert");
         }
