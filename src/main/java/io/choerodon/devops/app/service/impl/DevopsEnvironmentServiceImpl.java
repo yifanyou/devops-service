@@ -121,6 +121,7 @@ public class DevopsEnvironmentServiceImpl implements DevopsEnvironmentService {
     @Override
     @Saga(code = "devops-create-env", description = "创建环境", inputSchema = "{}")
     public void create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO) {
+        devopsEnviromentDTO.setCode(projectId + "-" + devopsEnviromentDTO.getCode());
         DevopsEnvironmentE devopsEnvironmentE = ConvertHelper.convert(devopsEnviromentDTO, DevopsEnvironmentE.class);
         devopsEnvironmentE.initProjectE(projectId);
         checkCode(projectId, devopsEnviromentDTO.getClusterId(), devopsEnviromentDTO.getCode());

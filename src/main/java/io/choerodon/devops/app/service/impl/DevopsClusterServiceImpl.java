@@ -68,9 +68,9 @@ public class DevopsClusterServiceImpl implements DevopsClusterService {
     @Override
     @Transactional
     public String createCluster(Long organizationId, DevopsClusterReqDTO devopsClusterReqDTO) {
+        devopsClusterReqDTO.setCode(organizationId + "-" + devopsClusterReqDTO.getCode());
         DevopsClusterE devopsClusterE = new DevopsClusterE();
         BeanUtils.copyProperties(devopsClusterReqDTO, devopsClusterE);
-        devopsClusterE.setCode(organizationId + "-" + devopsClusterE.getCode());
         devopsClusterE.setToken(GenerateUUID.generateUUID());
         devopsClusterE.setOrganizationId(organizationId);
         devopsClusterE = devopsClusterRepository.create(devopsClusterE);
