@@ -27,7 +27,8 @@ application-default.yml
 init-local-database.sh
 values_yaml.spec
 
-### Doxygen ###
-html/**
-latex/**
-Doxyfile
+### macos junk file
+.DS_Store
+
+### JRebel
+rebel.xml

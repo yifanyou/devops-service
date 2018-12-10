@@ -31,8 +31,6 @@ public interface DevopsServiceRepository {
 
     List<Long> selectDeployedEnv();
 
-    DevopsServiceE selectByNameAndNamespace(String name, String namespace);
-
     DevopsServiceE selectByNameAndEnvId(String name, Long envId);
 
     Boolean checkEnvHasService(Long envId);
@@ -40,4 +38,8 @@ public interface DevopsServiceRepository {
     List<DevopsServiceE> list();
 
     List<DevopsServiceE> selectByEnvId(Long envId);
+
+    void setLablesToNull(Long id);
+
+    void deleteServiceAndInstanceByEnvId(Long envId);
 }

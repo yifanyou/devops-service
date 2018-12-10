@@ -69,27 +69,36 @@ public class CertificationServiceImpl implements CertificationService {
     private GitlabRepository gitlabRepository;
     @Autowired
     private DevopsEnvCommandRepository devopsEnvCommandRepository;
-
+    @Autowired
+    private DevopsEnvUserPermissionRepository devopsEnvUserPermissionRepository;
 
     @Override
     public void create(Long projectId, C7nCertificationDTO certificationDTO,
                        MultipartFile key, MultipartFile cert, Boolean isGitOps) {
+
+        //校验用户是否有环境的权限
+        devopsEnvUserPermissionRepository.checkEnvDeployPermission(TypeUtil.objToLong(GitUserNameUtil.getUserId()), certificationDTO.getEnvId());
+
         String certName = certificationDTO.getCertName();
         String type = certificationDTO.getType();
         List<String> domains = certificationDTO.getDomains();
 
         Long envId = certificationDTO.getEnvId();
-        devopsCertificationValidator.checkCertification(envId, certName);
 
-        // agent certification
+        //校验环境是否链接
         DevopsEnvironmentE devopsEnvironmentE = devopsEnvironmentRepository.queryById(envId);
+
+        envUtil.checkEnvConnection(devopsEnvironmentE.getClusterE().getId(), envListener);
+
+        devopsCertificationValidator.checkCertification(envId, certName);
 
 
         // status operating
         CertificationE certificationE = new CertificationE(null,
                 certName, devopsEnvironmentE, domains, CertificationStatus.OPERATING.getStatus());
-        // create
+
         C7nCertification c7nCertification = null;
+
         if (!isGitOps) {
             String envCode = devopsEnvironmentE.getCode();
             String path = fileTmpPath(projectId, envCode);
@@ -102,16 +111,31 @@ public class CertificationServiceImpl implements CertificationService {
             ObjectOperation<C7nCertification> certificationOperation = new ObjectOperation<>();
             certificationOperation.setType(c7nCertification);
             operateEnvGitLabFile(certName, devopsEnvironmentE, c7nCertification);
+
+
+            //创建证书,当集群速度较快时，会导致部署速度快于gitlab创文件的返回速度，从而证书成功的状态会被错误更新为处理中，所以用after去区分是否部署成功。成功不再执行证书数据库操作
+            CertificationE afterCertificationE = certificationRepository.queryByEnvAndName(devopsEnvironmentE.getId(), certificationE.getName());
+            if (afterCertificationE == null) {
+                // create
+                certificationE = certificationRepository.create(certificationE);
+                Long certId = certificationE.getId();
+                // cert command
+                certificationE.setCommandId(createCertCommandE(CommandType.CREATE.getType(), certId, null));
+                certificationRepository.updateCommandId(certificationE);
+                // store crt & key if type is upload
+                storeCertFile(c7nCertification, certId);
+            }
+        } else {
+            // create
+            certificationE = certificationRepository.create(certificationE);
+            Long certId = certificationE.getId();
+            // cert command
+            certificationE.setCommandId(createCertCommandE(CommandType.CREATE.getType(), certId, null));
+            certificationRepository.updateCommandId(certificationE);
+            // store crt & key if type is upload
+            storeCertFile(c7nCertification, certId);
         }
-        certificationE = certificationRepository.create(certificationE);
-        Long certId = certificationE.getId();
 
-        // cert command
-        certificationE.setCommandId(createCertCommandE(CommandType.CREATE.getType(), certId, null));
-        certificationRepository.updateCommandId(certificationE);
-
-        // store crt & key if type is upload
-        storeCertFile(c7nCertification, certId);
     }
 
     private void removeFiles(String path, MultipartFile multipartFile) {
@@ -124,8 +148,11 @@ public class CertificationServiceImpl implements CertificationService {
         if (c7nCertification != null) {
             CertificationExistCert existCert = c7nCertification.getSpec().getExistCert();
             if (existCert != null) {
-                certificationRepository.storeCertFile(
-                        new CertificationFileDO(certId, existCert.getCert(), existCert.getKey()));
+                CertificationE certificationE = new CertificationE();
+                certificationE.setCertificationFileId(certificationRepository.storeCertFile(
+                        new CertificationFileDO(existCert.getCert(), existCert.getKey())));
+                certificationE.setId(certId);
+                certificationRepository.updateCertFileId(certificationE);
             }
         }
     }
@@ -179,8 +206,12 @@ public class CertificationServiceImpl implements CertificationService {
     public void deleteById(Long certId) {
         CertificationE certificationE = certificationRepository.queryById(certId);
         Long certEnvId = certificationE.getEnvironmentE().getId();
-        envUtil.checkEnvConnection(certEnvId, envListener);
+        //校验用户是否有环境的权限
+        devopsEnvUserPermissionRepository.checkEnvDeployPermission(TypeUtil.objToLong(GitUserNameUtil.getUserId()), certEnvId);
         DevopsEnvironmentE devopsEnvironmentE = devopsEnvironmentRepository.queryById(certEnvId);
+
+        envUtil.checkEnvConnection(devopsEnvironmentE.getClusterE().getId(), envListener);
+
 
         UserAttrE userAttrE = userAttrRepository.queryById(TypeUtil.objToLong(GitUserNameUtil.getUserId()));
         gitlabGroupMemberService.checkEnvProject(devopsEnvironmentE, userAttrE);
@@ -189,6 +220,15 @@ public class CertificationServiceImpl implements CertificationService {
         String certName = certificationE.getName();
         DevopsEnvFileResourceE devopsEnvFileResourceE = devopsEnvFileResourceRepository
                 .queryByEnvIdAndResource(certEnvId, certId, certificateType);
+
+        if (devopsEnvFileResourceE == null) {
+            certificationRepository.deleteById(certId);
+        }
+        certificationE.setCommandId(createCertCommandE(CommandType.DELETE.getType(), certId, null));
+        certificationRepository.updateCommandId(certificationE);
+        certificationE.setStatus(CertificationStatus.DELETING.getStatus());
+        certificationRepository.updateStatus(certificationE);
+
         if (devopsEnvFileResourceE != null && devopsEnvFileResourceE.getFilePath() != null
                 && devopsEnvFileResourceRepository
                 .queryByEnvIdAndPath(certEnvId, devopsEnvFileResourceE.getFilePath()).size() == 1) {
@@ -209,10 +249,6 @@ public class CertificationServiceImpl implements CertificationService {
                     "delete", userAttrE.getGitlabUserId(), certId, certificateType, certEnvId,
                     devopsEnvironmentService.handDevopsEnvGitRepository(devopsEnvironmentE));
         }
-        certificationE.setCommandId(createCertCommandE(CommandType.DELETE.getType(), certId, null));
-        certificationRepository.updateCommandId(certificationE);
-        certificationE.setStatus(CertificationStatus.DELETING.getStatus());
-        certificationRepository.updateStatus(certificationE);
     }
 
     @Override
@@ -220,7 +256,9 @@ public class CertificationServiceImpl implements CertificationService {
         CertificationE certificationE = certificationRepository.queryById(certId);
 
         //校验环境是否连接
-        envUtil.checkEnvConnection(certificationE.getEnvironmentE().getId(), envListener);
+        DevopsEnvironmentE devopsEnvironmentE = devopsEnvironmentRepository.queryById(certificationE.getEnvironmentE().getId());
+
+        envUtil.checkEnvConnection(devopsEnvironmentE.getClusterE().getId(), envListener);
 
         //实例相关对象数据库操作
         DevopsEnvCommandE devopsEnvCommandE = devopsEnvCommandRepository
@@ -235,6 +273,7 @@ public class CertificationServiceImpl implements CertificationService {
         if (params == null) {
             params = "{}";
         }
+
         return certificationRepository.page(projectId, envId, pageRequest, params);
     }
 

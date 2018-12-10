@@ -10,8 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.context.annotation.Import
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
+import spock.lang.Subject
 
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 
@@ -24,6 +26,7 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Import(IntegrationTestConfiguration)
+@Subject(DevopsEnvGroupController)
 @Stepwise
 class DevopsEnvGroupControllerSpec extends Specification {
 
@@ -32,110 +35,112 @@ class DevopsEnvGroupControllerSpec extends Specification {
     @Autowired
     private TestRestTemplate restTemplate
     @Autowired
-    private DevopsEnvGroupMapper devopsEnvGroupMapper
+    DevopsEnvGroupMapper devopsEnvGroupMapper
     @Autowired
-    private DevopsEnvironmentMapper devopsEnvironmentMapper
+    DevopsEnvironmentMapper devopsEnvironmentMapper
 
-    private DevopsEnvGroupDO devopsEnvGroupDO
-    private DevopsEnvGroupDO devopsEnvGroupDO1
+    @Shared
+    DevopsEnvGroupDO devopsEnvGroupDO = new DevopsEnvGroupDO()
+    @Shared
+    DevopsEnvGroupDO devopsEnvGroupDO1 = new DevopsEnvGroupDO()
 
-    def setup() {
-        if (flag == 0) {
-            devopsEnvGroupDO = new DevopsEnvGroupDO()
-            devopsEnvGroupDO.setName("test")
-            devopsEnvGroupDO.setProjectId(1L)
-            devopsEnvGroupDO.setSequence(1L)
-            devopsEnvGroupDO.setObjectVersionNumber(1L)
+    def setupSpec() {
+        devopsEnvGroupDO.setId(1L)
+        devopsEnvGroupDO.setName("test")
+        devopsEnvGroupDO.setProjectId(1L)
+        devopsEnvGroupDO.setSequence(1L)
+        devopsEnvGroupDO.setObjectVersionNumber(1L)
 
-            devopsEnvGroupDO1 = new DevopsEnvGroupDO()
-            devopsEnvGroupDO1.setName("test1")
-            devopsEnvGroupDO1.setProjectId(1L)
-            devopsEnvGroupDO1.setSequence(2L)
-            devopsEnvGroupDO1.setObjectVersionNumber(1L)
-            devopsEnvGroupMapper.insert(devopsEnvGroupDO)
-            devopsEnvGroupMapper.insert(devopsEnvGroupDO1)
+        devopsEnvGroupDO1.setId(2L)
+        devopsEnvGroupDO1.setName("test1")
+        devopsEnvGroupDO1.setProjectId(1L)
+        devopsEnvGroupDO1.setSequence(2L)
+        devopsEnvGroupDO1.setObjectVersionNumber(1L)
 
-            flag = 1
-        }
     }
 
     def "Create"() {
-        when:
+        given: '创建环境组'
+        devopsEnvGroupMapper.insert(devopsEnvGroupDO)
+        devopsEnvGroupMapper.insert(devopsEnvGroupDO1)
+
+        when: '项目下创建环境组'
         def envDTO = restTemplate.postForObject("/v1/projects/1/env_groups?devopsEnvGroupName=test2", null, DevopsEnvGroupDTO.class)
 
-        then:
-        envDTO != null
+        then: '校验返回结果'
+        envDTO["id"] == 3
     }
 
     def "Update"() {
-        given:
+        given: '初始化更新DTO类'
         DevopsEnvGroupDTO devopsEnvGroupDTO = new DevopsEnvGroupDTO()
         devopsEnvGroupDTO.setId(1L)
         devopsEnvGroupDTO.setName("name")
 
-        when:
+        when: '项目下更新环境组'
         restTemplate.put("/v1/projects/1/env_groups", devopsEnvGroupDTO, DevopsEnvGroupDTO.class)
 
-        then:
-        true
+        then: '校验更新结果'
+        devopsEnvGroupMapper.selectByPrimaryKey(1L)["name"] == "name"
     }
 
-    /**
-     * h2数据库不支持mysql的某些方言
-     */
-//    def "Sort"() {
-//        given:
-//        List<Long> longList = new ArrayList<>()
-//        longList.add(1L)
-//        longList.add(2L)
-//
-//        DevopsEnvGroupDO devopsEnvGroupDO = new DevopsEnvGroupDO()
-//        devopsEnvGroupDO.setId(1L)
-//        devopsEnvGroupDO.setProjectId(1L)
-//        DevopsEnvGroupDO devopsEnvGroupDO1 = new DevopsEnvGroupDO()
-//        devopsEnvGroupDO1.setId(2L)
-//        devopsEnvGroupDO1.setProjectId(2L)
-//
-//        when:
-//        restTemplate.put("/v1/projects/1/env_groups/sort", longList, List.class)
-//        then:
-//        true
-//    }
-
     def "ListByProject"() {
-        when:
-        restTemplate.getForObject("/v1/projects/1/env_groups", List.class)
+        when: '项目下查询环境组'
+        def devopsEnvGroups = restTemplate.getForObject("/v1/projects/1/env_groups", List.class)
 
-        then:
-        true
+        then: '校验返回结果'
+        devopsEnvGroups.size() == 3
     }
 
     def "CheckName"() {
-        when:
+        when: '校验环境组名唯一性'
         def isUnique = restTemplate.getForObject("/v1/projects/1/env_groups/checkName?name=test", Boolean.class)
 
-        then:
-        isUnique == true
+        then: '返回值'
+        isUnique
     }
 
     def "Delete"() {
-        given:
+        given: '创建环境DO类'
         DevopsEnvironmentDO devopsEnvironmentDO = new DevopsEnvironmentDO()
+        devopsEnvironmentDO.setId(1L)
         devopsEnvironmentDO.setProjectId(1L)
         devopsEnvironmentDO.setActive(true)
+        devopsEnvironmentDO.setGitlabEnvProjectId(1L)
         devopsEnvironmentDO.setSequence(1L)
+        devopsEnvironmentDO.setCode("env")
+        devopsEnvironmentDO.setDevopsEnvGroupId(1L)
         DevopsEnvironmentDO devopsEnvironmentDO1 = new DevopsEnvironmentDO()
+        devopsEnvironmentDO1.setId(2L)
         devopsEnvironmentDO1.setProjectId(1L)
         devopsEnvironmentDO1.setActive(true)
+        devopsEnvironmentDO1.setCode("env1")
+        devopsEnvironmentDO1.setGitlabEnvProjectId(1L)
         devopsEnvironmentDO1.setSequence(2L)
         devopsEnvironmentDO1.setDevopsEnvGroupId(1L)
         devopsEnvironmentMapper.insert(devopsEnvironmentDO)
         devopsEnvironmentMapper.insert(devopsEnvironmentDO1)
 
-        when:
+        when: '环境组删除'
         restTemplate.delete("/v1/projects/1/env_groups/1")
 
-        then:
-        true
+        then: '验证是否删除'
+        devopsEnvGroupMapper.selectByPrimaryKey(1L) == null
+
+        and: '清理数据'
+        // 删除envGroup
+        List<DevopsEnvGroupDO> list = devopsEnvGroupMapper.selectAll()
+        if (list != null && !list.isEmpty()) {
+            for (DevopsEnvGroupDO e : list) {
+                devopsEnvGroupMapper.delete(e)
+            }
+        }
+        // 删除env
+        List<DevopsEnvironmentDO> list1 = devopsEnvironmentMapper.selectAll()
+        if (list1 != null && !list1.isEmpty()) {
+            for (DevopsEnvironmentDO e : list1) {
+                devopsEnvironmentMapper.delete(e)
+            }
+        }
     }
 }

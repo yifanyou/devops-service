@@ -1,24 +1,37 @@
 package io.choerodon.devops.api.controller.v1
 
 import io.choerodon.devops.IntegrationTestConfiguration
-import io.choerodon.devops.domain.application.entity.ApplicationE
-import io.choerodon.devops.domain.application.entity.ApplicationVersionE
 import io.choerodon.devops.domain.application.entity.ProjectE
-import io.choerodon.devops.domain.application.repository.ApplicationRepository
+import io.choerodon.devops.domain.application.entity.UserAttrE
 import io.choerodon.devops.domain.application.repository.ApplicationVersionRepository
 import io.choerodon.devops.domain.application.repository.IamRepository
-import io.choerodon.devops.domain.application.valueobject.ApplicationVersionReadmeV
 import io.choerodon.devops.domain.application.valueobject.Organization
+import io.choerodon.devops.infra.common.util.FileUtil
+import io.choerodon.devops.infra.dataobject.ApplicationDO
+import io.choerodon.devops.infra.dataobject.ApplicationVersionDO
+import io.choerodon.devops.infra.dataobject.ApplicationVersionReadmeDO
+import io.choerodon.devops.infra.dataobject.ApplicationVersionValueDO
+import io.choerodon.devops.infra.dataobject.iam.OrganizationDO
+import io.choerodon.devops.infra.dataobject.iam.ProjectDO
+import io.choerodon.devops.infra.feign.IamServiceClient
+import io.choerodon.devops.infra.mapper.ApplicationMapper
+import io.choerodon.devops.infra.mapper.ApplicationVersionMapper
+import io.choerodon.devops.infra.mapper.ApplicationVersionReadmeMapper
+import io.choerodon.devops.infra.mapper.ApplicationVersionValueMapper
+import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.context.annotation.Import
 import org.springframework.core.io.FileSystemResource
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
+import spock.lang.Subject
 
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 
@@ -30,83 +43,145 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
  */
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @Import(IntegrationTestConfiguration)
+@Subject(CiController)
 @Stepwise
 class CiControllerSpec extends Specification {
+
     @Autowired
     private TestRestTemplate restTemplate
+
     @Autowired
-    private ApplicationRepository applicationRepository
+    private ApplicationMapper applicationMapper
+    @Autowired
+    private ApplicationVersionMapper applicationVersionMapper
+    @Autowired
+    private
+    ApplicationVersionReadmeMapper applicationVersionReadmeMapper
+    @Autowired
+    private ApplicationVersionValueMapper applicationVersionValueMapper
     @Autowired
     private ApplicationVersionRepository applicationVersionRepository
 
     @Autowired
-    @Qualifier("mockIamRepository")
     private IamRepository iamRepository
 
-    def "QueryFile"() {
-        given:
-        Organization organization = new Organization()
-        organization.setId(1L)
-        organization.setCode("ocode")
+    IamServiceClient iamServiceClient = Mockito.mock(IamServiceClient.class)
 
-        ProjectE projectE = new ProjectE()
-        projectE.setId(1L)
-        projectE.setCode("pcode")
+    @Shared
+    Organization organization = new Organization()
+    @Shared
+    ProjectE projectE = new ProjectE()
+    @Shared
+    UserAttrE userAttrE = new UserAttrE()
+    @Shared
+    Long project_id = 1L
+    @Shared
+    Long init_id = 1L
+    @Shared
+    ApplicationDO applicationDO
+
+    def setupSpec() {
+        given:
+        organization.setId(init_id)
+        organization.setCode("org")
+
+        projectE.setId(init_id)
+        projectE.setCode("pro")
         projectE.setOrganization(organization)
 
-        ApplicationE applicationE = new ApplicationE()
-        applicationE.setProjectE(projectE)
-        applicationE.setToken("token")
-        applicationE.setCode("acode")
-        applicationRepository.create(applicationE)
+        userAttrE.setIamUserId(init_id)
+        userAttrE.setGitlabUserId(init_id)
 
-        when:
-        restTemplate.getForObject("/ci?token=token", String.class)
+        applicationDO = new ApplicationDO()
+        applicationDO.setId(1L)
+        applicationDO.setProjectId(project_id)
+        applicationDO.setToken("token")
+        applicationDO.setCode("app")
+    }
 
-        then:
-        iamRepository.queryIamProject(_ as Long) >> projectE
-        iamRepository.queryOrganizationById(_ as Long) >> organization
+    def setup() {
+        iamRepository.initMockIamService(iamServiceClient)
+
+        ProjectDO projectDO = new ProjectDO()
+        projectDO.setId(1L)
+        projectDO.setCode("pro")
+        projectDO.setOrganizationId(1L)
+        ResponseEntity<ProjectDO> responseEntity = new ResponseEntity<>(projectDO, HttpStatus.OK)
+        Mockito.doReturn(responseEntity).when(iamServiceClient).queryIamProject(1L)
+
+        OrganizationDO organizationDO = new OrganizationDO()
+        organizationDO.setId(1L)
+        organizationDO.setCode("org")
+        ResponseEntity<OrganizationDO> responseEntity1 = new ResponseEntity<>(organizationDO, HttpStatus.OK)
+        Mockito.doReturn(responseEntity1).when(iamServiceClient).queryOrganizationById(1L)
+    }
+
+    def "QueryFile"() {
+        given: '创建应用'
+        applicationMapper.insert(applicationDO)
+
+        when: '应用查询ci脚本文件'
+        def str = restTemplate.getForObject("/ci?token=token", String.class)
+
+        then: '校验返回结果'
+        str != null && "" != str
     }
 
     def "Create"() {
-        given:
-        Organization organization = new Organization()
-        organization.setId(1L)
-        organization.setCode("ocode")
-
-        ProjectE projectE = new ProjectE()
-        projectE.setId(1L)
-        projectE.setCode("pcode")
-        projectE.setOrganization(organization)
-
-        ApplicationE applicationE = new ApplicationE()
-        applicationE.setProjectE(projectE)
-        applicationE.setToken("token2222")
-        applicationE.setCode("acode")
-        applicationRepository.create(applicationE)
-
-        ApplicationVersionReadmeV applicationVersionReadmeV = new ApplicationVersionReadmeV()
-        applicationVersionReadmeV.setReadme("readme")
-        ApplicationVersionE applicationVersionE = new ApplicationVersionE()
-        applicationVersionE.setApplicationE(applicationE)
-        applicationVersionE.setVersion("version")
-        applicationVersionE.setApplicationVersionReadmeV(applicationVersionReadmeV)
-        ApplicationVersionE applicationVersionE1 = new ApplicationVersionE()
-        applicationVersionE1.setApplicationE(applicationE)
-        applicationVersionE1.setVersion("version")
-        applicationVersionE1.setApplicationVersionReadmeV(applicationVersionReadmeV)
-        applicationVersionRepository.create(applicationVersionE)
-        applicationVersionRepository.create(applicationVersionE1)
+        given: '创建应用版本'
+        ApplicationVersionDO applicationVersionDO = new ApplicationVersionDO()
+        applicationVersionDO.setId(1L)
+        applicationVersionDO.setAppId(init_id)
+        applicationVersionDO.setVersion("oldVersion")
+        applicationVersionDO.setReadmeValueId(init_id)
+        applicationVersionMapper.insert(applicationVersionDO)
 
         FileSystemResource resource = new FileSystemResource(new File("src/test/resources/key.tar.gz"))
         MultiValueMap<String, Object> file = new LinkedMultiValueMap<>()
         file.add("file", resource)
 
-        when:
-        restTemplate.postForObject("/ci?image=iamge&token=token&version=version&commit=commit", file, String.class)
+        when: '获取应用版本信息'
+        restTemplate.postForObject("/ci?image=iamge&token=token&version=version&commit=commit", file,
+                String.class)
 
-        then:
-        iamRepository.queryIamProject(_ as Long) >> projectE
-        iamRepository.queryOrganizationById(_ as Long) >> organization
+        then: '校验文件是否创建'
+        File gzFile = new File("/Charts/org/pro/key.tar.gz")
+        gzFile.getName() == "key.tar.gz"
+        File yamlFile = new File("/devopsversion/values.yaml")
+        yamlFile.getName() == "values.yaml"
+
+        // 删除app
+        List<ApplicationDO> list = applicationMapper.selectAll()
+        if (list != null && !list.isEmpty()) {
+            for (ApplicationDO e : list) {
+                applicationMapper.delete(e)
+            }
+        }
+        // 删除appVersion
+        List<ApplicationVersionDO> list1 = applicationVersionMapper.selectAll()
+        if (list1 != null && !list1.isEmpty()) {
+            for (ApplicationVersionDO e : list1) {
+                applicationVersionMapper.delete(e)
+            }
+        }
+        // 删除appVersionReadme
+        List<ApplicationVersionReadmeDO> list2 = applicationVersionReadmeMapper.selectAll()
+        if (list2 != null && !list2.isEmpty()) {
+            for (ApplicationVersionReadmeDO e : list2) {
+                applicationVersionReadmeMapper.delete(e)
+            }
+        }
+        // 删除appVersionValue
+        List<ApplicationVersionValueDO> list3 = applicationVersionValueMapper.selectAll()
+        if (list3 != null && !list3.isEmpty()) {
+            for (ApplicationVersionValueDO e : list3) {
+                applicationVersionValueMapper.delete(e)
+            }
+        }
+    }
+
+    //清除测试数据
+    def cleanupSpec() {
+        FileUtil.deleteDirectory(new File("Charts"))
     }
 }

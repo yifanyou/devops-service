@@ -28,6 +28,7 @@ public class DevopsIngressPathDO extends AuditDomain {
     private Long serviceId;
     private String serviceName;
     private Long servicePort;
+    private String rewritePath;
 
     public DevopsIngressPathDO() {
     }
@@ -45,6 +46,18 @@ public class DevopsIngressPathDO extends AuditDomain {
         this.serviceId = serviceId;
         this.serviceName = serviceName;
         this.servicePort = servicePort;
+    }
+
+    /**
+     * 构造函数
+     */
+    public DevopsIngressPathDO(Long ingressId, String path, String rewritePath, Long serviceId, String serviceName, Long servicePort) {
+        this.ingressId = ingressId;
+        this.path = path;
+        this.serviceId = serviceId;
+        this.serviceName = serviceName;
+        this.servicePort = servicePort;
+        this.rewritePath = rewritePath;
     }
 
     public Long getId() {
@@ -97,6 +110,14 @@ public class DevopsIngressPathDO extends AuditDomain {
         this.servicePort = servicePort;
     }
 
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -109,11 +130,12 @@ public class DevopsIngressPathDO extends AuditDomain {
         return Objects.equals(ingressId, that.ingressId)
                 && Objects.equals(path, that.path)
                 && Objects.equals(serviceId, that.serviceId)
-                && Objects.equals(servicePort,that.servicePort);
+                && Objects.equals(servicePort,that.servicePort)
+                && Objects.equals(rewritePath, that.rewritePath);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(ingressId, path, serviceId);
+        return Objects.hash(ingressId, path, rewritePath, serviceId);
     }
 }

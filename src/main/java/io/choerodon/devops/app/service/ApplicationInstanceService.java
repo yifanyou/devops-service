@@ -34,7 +34,7 @@ public interface ApplicationInstanceService {
      * @param appId     应用id
      * @return page of ApplicationInstancesDTO
      */
-    List<ApplicationInstancesDTO> listApplicationInstances(Long projectId, Long appId, Long envGroupId);
+    List<ApplicationInstancesDTO> listApplicationInstances(Long projectId, Long appId);
 
     /**
      * 查询value列表
@@ -62,15 +62,6 @@ public interface ApplicationInstanceService {
      */
     ApplicationInstanceDTO createOrUpdateByGitOps(ApplicationDeployDTO applicationDeployDTO, Long userId);
 
-
-    /**
-     * 获取版本特性
-     *
-     * @param appInstanceId 实例id
-     * @return list of versionFeaturesDTO
-     */
-    List<VersionFeaturesDTO> queryVersionFeatures(Long appInstanceId);
-
     /**
      * 查询运行中的实例
      *
@@ -81,6 +72,16 @@ public interface ApplicationInstanceService {
      * @return list of AppInstanceCodeDTO
      */
     List<AppInstanceCodeDTO> listByOptions(Long projectId, Long appId, Long appVersionId, Long envId);
+
+    /**
+     * 环境下某应用运行中或失败的实例
+     *
+     * @param projectId 项目id
+     * @param appId     应用id
+     * @param envId     环境id
+     * @return list of AppInstanceCodeDTO
+     */
+    List<AppInstanceCodeDTO> listByAppIdAndEnvId(Long projectId, Long appId, Long envId);
 
     /**
      * 实例停止
@@ -95,6 +96,14 @@ public interface ApplicationInstanceService {
      * @param instanceId 实例id
      */
     void instanceStart(Long instanceId);
+
+
+    /**
+     * 实例重新部署
+     *
+     * @param instanceId 实例id
+     */
+    void instanceReStart(Long instanceId);
 
     /**
      * 实例删除
@@ -148,17 +157,9 @@ public interface ApplicationInstanceService {
      */
     DevopsEnvPreviewDTO listByEnv(Long projectId, Long envId, String params);
 
-
-    DevopsEnvPreviewInstanceDTO getDevopsEnvPreviewInstance(Long envId);
-
-
-    Page<DevopsEnvFileDTO> getEnvFile(Long projectId, Long envId, PageRequest pageRequest);
-
-
     ReplaceResult getReplaceResult(String versionValue, String deployValue);
 
     ReplaceResult queryUpgradeValue(Long instanceId, Long versionId);
-
 
     DeployTimeDTO listDeployTime(Long projectId, Long envId, Long[] appIds, Date startTime, Date endTime);
 

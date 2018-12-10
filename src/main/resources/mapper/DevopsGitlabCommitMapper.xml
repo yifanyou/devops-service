@@ -14,12 +14,12 @@
         dgc.url,
         da.`name` appName
         FROM
-        devops_gitlab_commit dgc,
-        devops_application da,
-        devops_project dp
+        devops_gitlab_commit dgc
+        JOIN devops_application da ON dgc.app_id = da.id
         WHERE
+        da.project_id = #{projectId}
         <if test="appIds != null">
-            dgc.app_id IN
+           AND dgc.app_id IN
             <foreach collection="appIds" item="appId" open="(" close=")" separator=",">
                 #{appId}
             </foreach>
@@ -27,13 +27,21 @@
         <if test="appIds == null">
             1
         </if>
+        <if test="startDate != null">
+            AND dgc.commit_date >= CONCAT('','${startDate}',' 00:00:00')
+        </if>
+        <if test="endDate != null">
+            AND dgc.commit_date <![CDATA[<=]]>  CONCAT('','${endDate}',' 23:59:59')
+        </if>
         AND da.is_active = 1
         AND dgc.app_id = da.id
-        AND dp.id = #{projectId}
-        AND da.project_id = dp.id
-        AND Date(dgc.commit_date) &gt;= #{startDate}
-        AND Date(dgc.commit_date) &lt;= #{endDate}
+        AND da.project_id = #{projectId}
+        <if test="startDate != null">
+            AND dgc.commit_date >= CONCAT('','${startDate}',' 00:00:00')
+        </if>
+        <if test="endDate != null">
+            AND dgc.commit_date <![CDATA[<=]]>  CONCAT('','${endDate}',' 23:59:59')
+        </if>
+        ORDER BY dgc.commit_date DESC
     </select>
 </mapper>
-
-        <!--CURDATE()-->

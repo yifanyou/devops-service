@@ -58,17 +58,20 @@
         JOIN devops_app_instance dai ON dai.app_id = da.id
         JOIN devops_env de ON de.id = dai.env_id
         left join devops_app_market dam on dam.app_id = da.id
+        RIGHT JOIN devops_env_pod dep ON dep.app_instance_id = dai.id
         WHERE
         de.project_id = #{projectId}
         AND de.id = #{envId}
-        <choose>
-            <when test="status == 'running'">
-                AND dai.`status` = 'running'
-            </when>
-            <when test="status == 'nodeleted'">
-                AND dai.`status` != 'deleted'
-            </when>
-        </choose>
+        <if test="status != null">
+            <choose>
+                <when test="status == 'running'">
+                    AND dai.`status` = 'running'
+                </when>
+                <when test="status == 'nodeleted'">
+                    AND dai.`status` != 'deleted'
+                </when>
+            </choose>
+        </if>
     </select>
 
     <select id="listActive" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
@@ -118,15 +121,21 @@
             </if>
             <if test='searchParam.active != null and searchParam.active.size > 0'>
                 AND
-                <foreach collection="searchParam.active" item="active" open="(" separator=" OR " close=")">
-                    <if test='active!=-1'>
-                        da.is_active = #{active,jdbcType=TINYINT}
-                        <if test='active==1'>
-                            and da.is_synchro = 1
-                        </if>
+                <foreach collection="searchParam.active" item="active">
+                    <if test='active == -1'>
+                        da.is_failed = 1
                     </if>
-                    <if test='active==-1'>
+                    <if test="active == 0">
+                        da.is_active = 0
+                    </if>
+                    <if test="active == 1">
+                        da.is_active = 1
+                        AND da.is_synchro = 1
+                        AND da.is_failed IS NULL
+                    </if>
+                    <if test="active == 2">
                         da.is_synchro = 0
+                        AND da.is_failed IS NULL
                     </if>
                 </foreach>
             </if>
@@ -212,5 +221,12 @@
         AND da.is_active = 1
         AND da.gitlab_project_id IS NOT NULL
         <include refid="sqlparam"/>
+    </select>
+
+    <select id="selectOneWithCaseSensitive" resultType="java.lang.Integer">
+        SELECT 1
+        FROM devops_application da
+        WHERE da.project_id = #{projectId}
+        AND BINARY ( da.`name` ) = #{appName}
     </select>
 </mapper>

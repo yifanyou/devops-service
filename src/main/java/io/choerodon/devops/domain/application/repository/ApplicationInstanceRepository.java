@@ -25,6 +25,8 @@ public interface ApplicationInstanceRepository {
 
     List<ApplicationInstanceE> listByOptions(Long projectId, Long appId, Long appVersionId, Long envId);
 
+    List<ApplicationInstanceE> listByAppIdAndEnvId(Long projectId, Long appId, Long envId);
+
     int checkOptions(Long envId, Long appId, Long appInstanceId);
 
     String queryValueByEnvIdAndAppId(Long envId, Long appId);
@@ -33,7 +35,7 @@ public interface ApplicationInstanceRepository {
 
     List<ApplicationInstanceE> selectByEnvId(Long envId);
 
-    List<ApplicationInstancesDO> getDeployInstances(Long projectId, Long appId, Long envGroupId);
+    List<ApplicationInstancesDO> getDeployInstances(Long projectId, Long appId, List<Long> envIds);
 
     List<ApplicationInstanceE> list();
 
@@ -46,7 +48,13 @@ public interface ApplicationInstanceRepository {
 
     List<DeployDO> listDeployFrequency(Long projectId, Long[] envIds, Long appId, Date startTime, Date endTime);
 
-    Page<DeployDO> pageDeployFrequencyDetail(Long projectId, PageRequest pageRequest, Long[] envIds, Long appId, Date startTime, Date endTime);
+    Page<DeployDO> pageDeployFrequencyDetail(Long projectId, PageRequest pageRequest, Long[] envIds, Long appId,
+                                             Date startTime, Date endTime);
 
-    Page<DeployDO> pageDeployTimeDetail(Long projectId, PageRequest pageRequest, Long envId, Long[] appIds, Date startTime, Date endTime);
+    Page<DeployDO> pageDeployTimeDetail(Long projectId, PageRequest pageRequest, Long envId, Long[] appIds,
+                                        Date startTime, Date endTime);
+
+    List<ApplicationInstanceE> listByAppId(Long appId);
+
+    void deleteAppInstanceByEnvId(Long envId);
 }

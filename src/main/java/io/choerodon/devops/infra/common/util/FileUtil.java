@@ -1,6 +1,5 @@
 package io.choerodon.devops.infra.common.util;
 
-import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
@@ -12,6 +11,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+import javax.servlet.http.HttpServletResponse;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -80,7 +80,7 @@ public class FileUtil {
             }
             return stringBuilder.toString();
         } catch (IOException e) {
-            throw new CommonException("error.param.render");
+            throw new CommonException("error.param.render", e);
         }
     }
 
@@ -125,7 +125,7 @@ public class FileUtil {
             try (InputStream inputStream = new FileInputStream(file)) {
                 FileUtils.writeStringToFile(file, replaceReturnString(inputStream, params));
             } catch (IOException e) {
-                throw new CommonException("error.param.replace");
+                throw new CommonException("error.param.replace", e);
             }
         }
     }
@@ -149,7 +149,7 @@ public class FileUtil {
                 out.flush();
             }
         } catch (IOException e) {
-            throw new CommonException("error.file.transfer");
+            throw new CommonException("error.file.transfer", e);
         }
         return path + System.getProperty("file.separator") + files.getOriginalFilename();
     }
@@ -329,7 +329,7 @@ public class FileUtil {
         File file = new File(filepath);
         List<String> filepaths = getFilesPath(file);
         if (!filepaths.isEmpty()) {
-            return filepaths.parallelStream()
+            return filepaths.stream()
                     .map(t -> t.replaceFirst(filepath + "/", "")).collect(Collectors.toList());
         }
         return new ArrayList<>();
@@ -799,7 +799,7 @@ public class FileUtil {
         return null;
     }
 
-    public static String getKeyValue(int complex, List<String> keys) {
+    private static String getKeyValue(int complex, List<String> keys) {
         String result = "";
         for (int i = 0; i < complex; i++) {
             result = result.equals("") ? result + keys.get(i) : result + "." + keys.get(i);
@@ -880,7 +880,7 @@ public class FileUtil {
      * @param value json value
      * @return yaml
      */
-    public static String jungeValueFormat(String value) {
+    public static String checkValueFormat(String value) {
         try {
             if (value.equals("")) {
                 return "{}";
@@ -898,7 +898,7 @@ public class FileUtil {
      *
      * @param yaml yaml value
      */
-    public static void jungeYamlFormat(String yaml) {
+    public static void checkYamlFormat(String yaml) {
         try {
             Composer composer = new Composer(new ParserImpl(new StreamReader(yaml)), new Resolver());
             composer.getSingleNode();
@@ -949,7 +949,7 @@ public class FileUtil {
                 }
             }
         } catch (IOException e) {
-            throw new CommonException("error.file.read");
+            throw new CommonException("error.file.read", e);
         }
         return content.toString();
     }
@@ -1013,7 +1013,7 @@ public class FileUtil {
 
             //分多次将一个文件读入，对于大型文件而言，比较推荐这种方式，占用内存比较少。
             byte[] buffer = new byte[1024];
-            int length = -1;
+            int length;
             while ((length = fis.read(buffer, 0, 1024)) != -1) {
                 md.update(buffer, 0, length);
             }
@@ -1081,7 +1081,7 @@ public class FileUtil {
                 getUnZipPath(zip, entry, zipEntryName, descDir);
             }
         } catch (IOException e) {
-            throw new CommonException("error.not.zip");
+            throw new CommonException("error.not.zip", e);
         }
         logger.info("******************解压完毕********************");
     }
@@ -1101,7 +1101,7 @@ public class FileUtil {
             logger.info(outPath);
             outPutUnZipFile(in, outPath);
         } catch (IOException e) {
-            throw new CommonException("error.zip.inputStream");
+            throw new CommonException("error.zip.inputStream", e);
         }
     }
 
@@ -1113,9 +1113,9 @@ public class FileUtil {
                 out.write(buf1, 0, len);
             }
         } catch (FileNotFoundException e) {
-            throw new CommonException("error.outPath");
+            throw new CommonException("error.outPath", e);
         } catch (IOException e) {
-            throw new CommonException("error.zip.outPutStream");
+            throw new CommonException("error.zip.outPutStream", e);
         }
     }
 
@@ -1133,7 +1133,7 @@ public class FileUtil {
             File sourceFile = new File(srcDir);
             compress(sourceFile, zos, sourceFile.getName(), keepDirStructure);
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
     }
 
@@ -1164,7 +1164,7 @@ public class FileUtil {
                         zos.putNextEntry(new ZipEntry(name + "/"));
                         zos.closeEntry();
                     } catch (IOException e) {
-                        throw new CommonException(e.getMessage());
+                        throw new CommonException(e.getMessage(), e);
                     }
                 }
 
@@ -1193,7 +1193,7 @@ public class FileUtil {
             }
             zos.closeEntry();
         } catch (IOException e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
     }
 
@@ -1204,12 +1204,14 @@ public class FileUtil {
      * @param filePath 文件路径
      */
     public static void downloadFile(HttpServletResponse res, String filePath) {
-        res.setHeader("content-type", "application/octet-stream");
+        res.setHeader("Content-type", "application/octet-stream");
         res.setContentType("application/octet-stream");
         res.setHeader("Content-Disposition", "attachment;filename=" + filePath);
+        File file = new File(filePath);
+        res.setHeader("Content-Length", "" + file.length());
         byte[] buff = new byte[1024];
-        OutputStream os = null;
-        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(new File(filePath)))) {
+        OutputStream os;
+        try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
             os = res.getOutputStream();
             int i = bis.read(buff);
             while (i != -1) {
@@ -1218,7 +1220,7 @@ public class FileUtil {
                 i = bis.read(buff);
             }
         } catch (IOException e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
 
     }

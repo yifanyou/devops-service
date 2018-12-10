@@ -48,10 +48,12 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
     private ApplicationVersionRepository applicationVersionRepository;
     @Autowired
     private DevopsEnvFileResourceService devopsEnvFileResourceService;
+    @Autowired
+    private ApplicationRepository applicationRepository;
 
     @Override
     public void handlerRelations(Map<String, String> objectPath, List<DevopsEnvFileResourceE> beforeSync, List<C7nHelmRelease> c7nHelmReleases, Long envId, Long projectId, String path, Long userId) {
-        List<String> beforeC7nRelease = beforeSync.parallelStream()
+        List<String> beforeC7nRelease = beforeSync.stream()
                 .filter(devopsEnvFileResourceE -> devopsEnvFileResourceE.getResourceType().equals(C7NHELM_RELEASE))
                 .map(devopsEnvFileResourceE -> {
                     ApplicationInstanceE applicationInstanceE = applicationInstanceRepository
@@ -67,7 +69,7 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
         //比较已存在实例和新增要处理的实例,获取新增实例，更新实例，删除实例
         List<C7nHelmRelease> addC7nHelmRelease = new ArrayList<>();
         List<C7nHelmRelease> updateC7nHelmRelease = new ArrayList<>();
-        c7nHelmReleases.parallelStream().forEach(c7nHelmRelease -> {
+        c7nHelmReleases.stream().forEach(c7nHelmRelease -> {
             if (beforeC7nRelease.contains(c7nHelmRelease.getMetadata().getName())) {
                 updateC7nHelmRelease.add(c7nHelmRelease);
                 beforeC7nRelease.remove(c7nHelmRelease.getMetadata().getName());
@@ -83,7 +85,13 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
         //删除instance,和文件对象关联关系
         beforeC7nRelease.forEach(releaseName -> {
             ApplicationInstanceE applicationInstanceE = applicationInstanceRepository.selectByCode(releaseName, envId);
-            DevopsEnvCommandE devopsEnvCommandE = devopsEnvCommandRepository.query(applicationInstanceE.getCommandId());
+            DevopsEnvCommandE devopsEnvCommandE;
+            if (applicationInstanceE.getCommandId() == null) {
+                devopsEnvCommandE = devopsEnvCommandRepository.queryByObject(ObjectType.INSTANCE.getType(), applicationInstanceE.getId());
+            } else {
+                devopsEnvCommandE = devopsEnvCommandRepository
+                        .query(applicationInstanceE.getCommandId());
+            }
             if (!devopsEnvCommandE.getCommandType().equals(CommandType.DELETE.getType())) {
                 DevopsEnvCommandE devopsEnvCommandE1 = new DevopsEnvCommandE();
                 devopsEnvCommandE1.setCommandType(CommandType.DELETE.getType());
@@ -207,6 +215,16 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
         }
         ApplicationVersionE applicationVersionE = applicationVersionRepository
                 .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+        if(applicationVersionE == null) {
+            ApplicationInstanceE applicationInstanceE = applicationInstanceRepository.selectByCode(c7nHelmRelease.getMetadata().getName(), envId);
+            if(applicationInstanceE != null) {
+                applicationE = applicationRepository.query(applicationInstanceE.getApplicationE().getId());
+                if(applicationE != null) {
+                    applicationVersionE = applicationVersionRepository
+                            .queryByAppAndVersion(applicationE.getId(), c7nHelmRelease.getSpec().getChartVersion());
+                }
+            }
+        }
         if (applicationVersionE == null) {
             throw new GitOpsExplainException("appversion.not.exist.in.database", filePath, c7nHelmRelease.getSpec().getChartVersion(), null);
         }
@@ -221,9 +239,10 @@ public class HandlerC7nReleaseRelationsServiceImpl implements HandlerObjectFileR
         if (type.equals("update")) {
             ApplicationInstanceE applicationInstanceE = applicationInstanceRepository
                     .selectByCode(c7nHelmRelease.getMetadata().getName(), envId);
+            DevopsEnvCommandE devopsEnvCommandE = devopsEnvCommandRepository.query(applicationInstanceE.getCommandId());
             String deployValue = applicationInstanceRepository.queryValueByInstanceId(applicationInstanceE.getId());
             ReplaceResult replaceResult = applicationInstanceService.getReplaceResult(deployValue, applicationDeployDTO.getValues());
-            if (deployValue != null && replaceResult.getNewLines().isEmpty() && applicationVersionE.getId().equals(applicationInstanceE.getApplicationVersionE().getId())) {
+            if (deployValue != null && replaceResult.getNewLines().isEmpty() && applicationVersionE.getId().equals(devopsEnvCommandE.getObjectVersionId())) {
                 applicationDeployDTO.setIsNotChange(true);
             }
             applicationDeployDTO.setAppInstanceId(applicationInstanceE.getId());

@@ -49,8 +49,7 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "分页查询应用部署")
     @CustomPageRequest
     @PostMapping(value = "/list_by_options")
@@ -58,8 +57,7 @@ public class ApplicationInstanceController {
             @ApiParam(value = "项目ID", required = true)
             @PathVariable(value = "project_id") Long projectId,
             @ApiIgnore
-            @ApiParam(value = "分页参数")
-                    PageRequest pageRequest,
+            @ApiParam(value = "分页参数") PageRequest pageRequest,
             @ApiParam(value = "环境ID")
             @RequestParam(required = false) Long envId,
             @ApiParam(value = "版本ID")
@@ -83,18 +81,15 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "查询多应用部署")
     @GetMapping(value = "/all")
     public ResponseEntity<List<ApplicationInstancesDTO>> listByAppId(
             @ApiParam(value = "项目ID", required = true)
             @PathVariable(value = "project_id") Long projectId,
             @ApiParam(value = "应用ID")
-            @RequestParam(required = false) Long appId,
-            @ApiParam(value = "应用组id")
-            @RequestParam(required = false) Long envGroupId) {
-        return Optional.ofNullable(applicationInstanceService.listApplicationInstances(projectId, appId, envGroupId))
+            @RequestParam(required = false) Long appId) {
+        return Optional.ofNullable(applicationInstanceService.listApplicationInstances(projectId, appId))
                 .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException("error.application.version.query"));
     }
@@ -107,7 +102,7 @@ public class ApplicationInstanceController {
      * @return string
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER, InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署 Value")
     @GetMapping(value = "/{appInstanceId}/value")
     public ResponseEntity<ReplaceResult> queryValue(
@@ -120,7 +115,6 @@ public class ApplicationInstanceController {
                 .orElseThrow(() -> new CommonException("error.instance.value.get"));
     }
 
-
     /**
      * 获取升级 Value
      *
@@ -130,7 +124,8 @@ public class ApplicationInstanceController {
      * @return string
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER,
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取升级 Value")
     @GetMapping(value = "/{appInstanceId}/appVersion/{appVersionId}/value")
     public ResponseEntity<ReplaceResult> queryUpgradeValue(
@@ -154,7 +149,8 @@ public class ApplicationInstanceController {
      * @param appVersionId 版本id
      * @return ReplaceResult
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "查询value列表")
     @GetMapping("/value")
     public ResponseEntity<ReplaceResult> queryValues(
@@ -178,7 +174,8 @@ public class ApplicationInstanceController {
      * @param replaceResult 部署value
      * @return ReplaceResult
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "查询预览value")
     @PostMapping("/previewValue")
     public ResponseEntity<ReplaceResult> previewValues(
@@ -199,7 +196,8 @@ public class ApplicationInstanceController {
      * @param replaceResult values对象
      * @return List
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "校验values")
     @PostMapping("/value_format")
     public ResponseEntity<List<ErrorLineDTO>> formatValue(
@@ -219,7 +217,8 @@ public class ApplicationInstanceController {
      */
     @ApiOperation(value = "部署应用")
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER,
+                    InitRoleCode.PROJECT_MEMBER})
     @PostMapping
     public ResponseEntity<ApplicationInstanceDTO> deploy(
             @ApiParam(value = "项目ID", required = true)
@@ -232,26 +231,6 @@ public class ApplicationInstanceController {
     }
 
     /**
-     * 获取版本特性
-     *
-     * @param projectId     项目id
-     * @param appInstanceId 实例id
-     * @return list of versionFeaturesDTO
-     */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
-    @ApiOperation(value = "获取版本特性")
-    @GetMapping("/{appInstanceId}/version_features")
-    public ResponseEntity<List<VersionFeaturesDTO>> queryVersionFeatures(
-            @ApiParam(value = "项目 ID", required = true)
-            @PathVariable(value = "project_id") Long projectId,
-            @ApiParam(value = "部署ID", required = true)
-            @PathVariable Long appInstanceId) {
-        return Optional.ofNullable(applicationInstanceService.queryVersionFeatures(appInstanceId))
-                .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
-                .orElseThrow(() -> new CommonException("error.version.values.query"));
-    }
-
-    /**
      * 查询运行中的实例
      *
      * @param projectId    项目id
@@ -260,7 +239,8 @@ public class ApplicationInstanceController {
      * @param envId        环境id
      * @return list of AppInstanceCodeDTO
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "查询运行中的实例")
     @GetMapping("/options")
     public ResponseEntity<List<AppInstanceCodeDTO>> listByAppVersionId(
@@ -277,6 +257,30 @@ public class ApplicationInstanceController {
                 .orElseThrow(() -> new CommonException("error.appInstance.query"));
     }
 
+    /**
+     * 环境下某应用运行中或失败的实例
+     *
+     * @param projectId 项目id
+     * @param appId     应用id
+     * @param envId     环境id
+     * @return list of AppInstanceCodeDTO
+     */
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
+    @ApiOperation(value = "环境下某应用运行中或失败的实例")
+    @GetMapping("/listByAppIdAndEnvId")
+    public ResponseEntity<List<AppInstanceCodeDTO>> listByAppIdAndEnvId(
+            @ApiParam(value = "项目 ID", required = true)
+            @PathVariable(value = "project_id") Long projectId,
+            @ApiParam(value = "环境 ID")
+            @RequestParam Long envId,
+            @ApiParam(value = "应用Id")
+            @RequestParam Long appId) {
+        return Optional.ofNullable(applicationInstanceService.listByAppIdAndEnvId(projectId, appId, envId))
+                .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
+                .orElseThrow(() -> new CommonException("error.appInstance.query"));
+    }
+
 
     /**
      * 获取部署实例资源对象
@@ -286,7 +290,7 @@ public class ApplicationInstanceController {
      * @return DevopsEnvResourceDTO
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER, InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署实例资源对象")
     @GetMapping("/{appInstanceId}/resources")
     public ResponseEntity<DevopsEnvResourceDTO> listResources(
@@ -307,7 +311,7 @@ public class ApplicationInstanceController {
      * @return list
      */
     @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER, InitRoleCode.DEPLOY_ADMINISTRATOR})
+            roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署实例hook阶段")
     @GetMapping("/{appInstanceId}/stages")
     public ResponseEntity<List<InstanceStageDTO>> listStages(
@@ -327,7 +331,8 @@ public class ApplicationInstanceController {
      * @param instanceId 实例id
      * @return responseEntity
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "实例停止")
     @PutMapping(value = "/{instanceId}/stop")
     public ResponseEntity stop(
@@ -346,7 +351,8 @@ public class ApplicationInstanceController {
      * @param instanceId 实例id
      * @return responseEntity
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "实例重启")
     @PutMapping(value = "/{instanceId}/start")
     public ResponseEntity start(
@@ -359,13 +365,34 @@ public class ApplicationInstanceController {
     }
 
     /**
+     * 实例重新部署
+     *
+     * @param projectId  项目id
+     * @param instanceId 实例id
+     * @return responseEntity
+     */
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
+    @ApiOperation(value = "实例重新部署")
+    @PutMapping(value = "/{instanceId}/restart")
+    public ResponseEntity restart(
+            @ApiParam(value = "项目 ID", required = true)
+            @PathVariable(value = "project_id") Long projectId,
+            @ApiParam(value = "实例ID", required = true)
+            @PathVariable Long instanceId) {
+        applicationInstanceService.instanceReStart(instanceId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    /**
      * 实例删除
      *
      * @param projectId  项目id
      * @param instanceId 实例id
      * @return responseEntity
      */
-    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.DEPLOY_ADMINISTRATOR})
+    @Permission(level = ResourceLevel.PROJECT, roles = {InitRoleCode.PROJECT_OWNER,
+            InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "实例删除")
     @DeleteMapping(value = "/{instanceId}/delete")
     public ResponseEntity delete(
@@ -388,8 +415,7 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "环境总览实例查询")
     @PostMapping(value = "/{envId}/listByEnv")
     public ResponseEntity<DevopsEnvPreviewDTO> listByEnv(
@@ -404,35 +430,6 @@ public class ApplicationInstanceController {
                 .orElseThrow(() -> new CommonException("error.appInstance.query"));
     }
 
-
-    /**
-     * 部署文件日志
-     *
-     * @param projectId 项目id
-     * @param envId     实例id
-     * @return DevopsEnvPreviewDTO
-     */
-    @Permission(level = ResourceLevel.PROJECT,
-            roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
-    @ApiOperation(value = "部署文件日志")
-    @CustomPageRequest
-    @GetMapping(value = "/{envId}/envFiles")
-    public ResponseEntity<Page<DevopsEnvFileDTO>> listEnvFiles(
-            @ApiParam(value = "项目 ID", required = true)
-            @PathVariable(value = "project_id") Long projectId,
-            @ApiParam(value = "envId", required = true)
-            @PathVariable(value = "envId") Long envId,
-            @ApiIgnore
-            @ApiParam(value = "分页参数")
-                    PageRequest pageRequest) {
-        return Optional.ofNullable(applicationInstanceService.getEnvFile(projectId, envId, pageRequest))
-                .map(target -> new ResponseEntity<>(target, HttpStatus.OK))
-                .orElseThrow(() -> new CommonException("error.env.file.query"));
-    }
-
-
     /**
      * 获取部署时长报表
      *
@@ -445,8 +442,7 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署时长报表")
     @PostMapping(value = "/env_commands/time")
     public ResponseEntity<DeployTimeDTO> listDeployTime(
@@ -478,8 +474,7 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署次数报表")
     @PostMapping(value = "/env_commands/frequency")
     public ResponseEntity<DeployFrequencyDTO> listDeployFrequency(
@@ -511,16 +506,14 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署次数报表table")
     @CustomPageRequest
     @PostMapping(value = "/env_commands/frequencyDetail")
     public ResponseEntity<Page<DeployDetailDTO>> pageDeployFrequencyDetail(
             @ApiParam(value = "项目 ID", required = true)
             @PathVariable(value = "project_id") Long projectId,
-            @ApiParam(value = "分页参数")
-                    PageRequest pageRequest,
+            @ApiParam(value = "分页参数") PageRequest pageRequest,
             @ApiParam(value = "appId")
             @RequestParam(required = false) Long appId,
             @ApiParam(value = "envIds")
@@ -547,8 +540,7 @@ public class ApplicationInstanceController {
      */
     @Permission(level = ResourceLevel.PROJECT,
             roles = {InitRoleCode.PROJECT_OWNER,
-                    InitRoleCode.PROJECT_MEMBER,
-                    InitRoleCode.DEPLOY_ADMINISTRATOR})
+                    InitRoleCode.PROJECT_MEMBER})
     @ApiOperation(value = "获取部署时长报表table")
     @CustomPageRequest
     @PostMapping(value = "/env_commands/timeDetail")

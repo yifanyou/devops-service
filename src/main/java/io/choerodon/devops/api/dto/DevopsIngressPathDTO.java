@@ -15,12 +15,7 @@ public class DevopsIngressPathDTO {
     private String serviceName;
     private String serviceStatus;
     private Long servicePort;
-    /**
-     * if is Empty do not add anything
-     * nginx.ingress.kubernetes.io/rewrite-target: {{ .Values.ingress.rewrite }}
-     */
     private String rewritePath;
-
 
     public DevopsIngressPathDTO() {
     }
@@ -35,12 +30,15 @@ public class DevopsIngressPathDTO {
         this.serviceStatus = serviceStatus;
     }
 
-    public String getRewritePath() {
-        return rewritePath;
-    }
-
-    public void setRewritePath(String rewritePath) {
+    /**
+     * 构造函数
+     */
+    public DevopsIngressPathDTO(String path, String rewritePath, Long serviceId, String serviceName, String serviceStatus) {
+        this.path = path;
         this.rewritePath = rewritePath;
+        this.serviceId = serviceId;
+        this.serviceName = serviceName;
+        this.serviceStatus = serviceStatus;
     }
 
     public String getPath() {
@@ -83,6 +81,14 @@ public class DevopsIngressPathDTO {
         this.servicePort = servicePort;
     }
 
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -94,12 +100,11 @@ public class DevopsIngressPathDTO {
         DevopsIngressPathDTO that = (DevopsIngressPathDTO) o;
         return Objects.equals(path, that.path)
                 && Objects.equals(serviceId, that.serviceId)
-                && Objects.equals(servicePort,that.servicePort)
-                && Objects.equals(rewritePath, that.rewritePath);
+                && Objects.equals(servicePort,that.servicePort);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, serviceId, rewritePath);
+        return Objects.hash(path, serviceId);
     }
 }

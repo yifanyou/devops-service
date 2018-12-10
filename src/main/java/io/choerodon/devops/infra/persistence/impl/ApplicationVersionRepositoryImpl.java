@@ -46,8 +46,8 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
     public List<ApplicationLatestVersionDO> listAppLatestVersion(Long projectId) {
         ProjectE projectE = iamRepository.queryIamProject(projectId);
         Long organizationId = projectE.getOrganization().getId();
-        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(organizationId, null);
-        List<Long> projectIds = projectEList.parallelStream().map(ProjectE::getId)
+        List<ProjectE> projectEList = iamRepository.listIamProjectByOrgId(organizationId, null, null);
+        List<Long> projectIds = projectEList.stream().map(ProjectE::getId)
                 .collect(Collectors.toCollection(ArrayList::new));
 
         return applicationVersionMapper.listAppLatestVersion(projectId, projectIds);
@@ -57,10 +57,10 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
     public ApplicationVersionE create(ApplicationVersionE applicationVersionE) {
         ApplicationVersionDO applicationVersionDO =
                 ConvertHelper.convert(applicationVersionE, ApplicationVersionDO.class);
+        applicationVersionDO.setReadmeValueId(setReadme(applicationVersionE.getApplicationVersionReadmeV().getReadme()));
         if (applicationVersionMapper.insert(applicationVersionDO) != 1) {
             throw new CommonException("error.version.insert");
         }
-        setReadme(applicationVersionDO.getId(), applicationVersionE.getApplicationVersionReadmeV().getReadme());
         return ConvertHelper.convert(applicationVersionDO, ApplicationVersionE.class);
     }
 
@@ -159,26 +159,26 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
     public Boolean checkAppAndVersion(Long appId, List<Long> appVersionIds) {
         if (appId == null || appVersionIds.isEmpty()) {
             throw new CommonException("error.app.version.check");
-
         }
         List<Long> versionList = applicationVersionMapper.selectVersionsByAppId(appId);
-        if (appVersionIds.parallelStream().anyMatch(t -> !versionList.contains(t))) {
+        if (appVersionIds.stream().anyMatch(t -> !versionList.contains(t))) {
             throw new CommonException("error.app.version.check");
         }
-
         return true;
     }
 
     @Override
-    public void setReadme(Long versionId, String readme) {
-        applicationVersionReadmeMapper.insert(new ApplicationVersionReadmeDO(versionId, readme));
+    public Long setReadme(String readme) {
+        ApplicationVersionReadmeDO applicationVersionReadmeDO = new ApplicationVersionReadmeDO(readme);
+        applicationVersionReadmeMapper.insert(applicationVersionReadmeDO);
+        return applicationVersionReadmeDO.getId();
     }
 
     @Override
-    public String getReadme(Long versionId) {
+    public String getReadme(Long readmeValueId) {
         String readme;
         try {
-            readme = applicationVersionReadmeMapper.selectOne(new ApplicationVersionReadmeDO(versionId)).getReadme();
+            readme = applicationVersionReadmeMapper.selectByPrimaryKey(readmeValueId).getReadme();
         } catch (Exception ignore) {
             readme = "# 暂无";
         }
@@ -192,17 +192,18 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
         if (applicationVersionMapper.updateByPrimaryKey(applicationVersionDO) != 1) {
             throw new CommonException("error.version.update");
         }
-        updateReadme(applicationVersionDO.getId(), applicationVersionE.getApplicationVersionReadmeV().getReadme());
+        updateReadme(applicationVersionMapper.selectByPrimaryKey(applicationVersionE.getId()).getReadmeValueId(), applicationVersionE.getApplicationVersionReadmeV().getReadme());
     }
 
-    private void updateReadme(Long versionId, String readme) {
+    private void updateReadme(Long readmeValueId, String readme) {
         ApplicationVersionReadmeDO readmeDO;
         try {
-            readmeDO = applicationVersionReadmeMapper.selectOne(new ApplicationVersionReadmeDO(versionId));
+
+            readmeDO = applicationVersionReadmeMapper.selectByPrimaryKey(readmeValueId);
             readmeDO.setReadme(readme);
             applicationVersionReadmeMapper.updateByPrimaryKey(readmeDO);
         } catch (Exception e) {
-            readmeDO = new ApplicationVersionReadmeDO(versionId, readme);
+            readmeDO = new ApplicationVersionReadmeDO(readme);
             applicationVersionReadmeMapper.insert(readmeDO);
         }
     }
@@ -226,5 +227,10 @@ public class ApplicationVersionRepositoryImpl implements ApplicationVersionRepos
         ApplicationVersionDO applicationVersionDO = new ApplicationVersionDO();
         applicationVersionDO.setCommit(sha);
         return ConvertHelper.convert(applicationVersionMapper.selectOne(applicationVersionDO), ApplicationVersionE.class);
+    }
+
+    @Override
+    public ApplicationVersionE getLatestVersion(Long appId) {
+        return ConvertHelper.convert(applicationVersionMapper.getLatestVersion(appId), ApplicationVersionE.class);
     }
 }

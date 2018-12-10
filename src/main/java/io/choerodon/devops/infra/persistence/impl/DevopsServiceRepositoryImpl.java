@@ -45,7 +45,8 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
     }
 
     @Override
-    public Page<DevopsServiceV> listDevopsServiceByPage(Long projectId, Long envId, PageRequest pageRequest, String searchParam) {
+    public Page<DevopsServiceV> listDevopsServiceByPage(Long projectId, Long envId, PageRequest pageRequest,
+                                                        String searchParam) {
         String sort = Lists.newArrayList(pageRequest.getSort().iterator()).stream()
                 .filter(t -> checkServiceParam(t.getProperty()))
                 .map(t -> t.getProperty() + " " + t.getDirection())
@@ -83,7 +84,6 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
                     devopsServiceMapper.listDevopsServiceByPage(
                             projectId, envId, null, null, start, size, sort));
         }
-
         return ConvertPageHelper.convertPage(
                 new Page<>(devopsServiceQueryDOList, pageInfo, count), DevopsServiceV.class);
     }
@@ -94,8 +94,7 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
 
     @Override
     public List<DevopsServiceV> listDevopsService(Long envId) {
-        List<DevopsServiceQueryDO> devopsServiceQueryDOList =
-                devopsServiceMapper.listDevopsService(envId);
+        List<DevopsServiceQueryDO> devopsServiceQueryDOList = devopsServiceMapper.listDevopsService(envId);
         return ConvertHelper.convertList(devopsServiceQueryDOList, DevopsServiceV.class);
     }
 
@@ -111,14 +110,12 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
         if (devopsServiceMapper.insert(devopsServiceDO) != 1) {
             throw new CommonException("error.k8s.service.create");
         }
-        return ConvertHelper.convert(
-                devopsServiceDO, DevopsServiceE.class);
+        return ConvertHelper.convert(devopsServiceDO, DevopsServiceE.class);
     }
 
     @Override
     public DevopsServiceE query(Long id) {
-        return ConvertHelper.convert(
-                devopsServiceMapper.selectByPrimaryKey(id), DevopsServiceE.class);
+        return ConvertHelper.convert(devopsServiceMapper.selectByPrimaryKey(id), DevopsServiceE.class);
     }
 
     @Override
@@ -130,24 +127,23 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
     public void update(DevopsServiceE devopsServiceE) {
         DevopsServiceDO devopsServiceDO = devopsServiceMapper.selectByPrimaryKey(devopsServiceE.getId());
         DevopsServiceDO devopsServiceDOUpdate = ConvertHelper.convert(devopsServiceE, DevopsServiceDO.class);
+        if (devopsServiceE.getLabels() == null) {
+            devopsServiceMapper.setLablesToNull(devopsServiceE.getId());
+        }
         devopsServiceDOUpdate.setObjectVersionNumber(devopsServiceDO.getObjectVersionNumber());
-        if (devopsServiceMapper.updateByPrimaryKeySelective(
-                devopsServiceDOUpdate) != 1) {
+        if (devopsServiceMapper.updateByPrimaryKeySelective(devopsServiceDOUpdate) != 1) {
             throw new CommonException("error.k8s.service.update");
         }
     }
 
     @Override
-    public List<Long> selectDeployedEnv() {
-        return devopsServiceMapper.selectDeployedEnv();
+    public void setLablesToNull(Long id) {
+        devopsServiceMapper.setLablesToNull(id);
     }
 
     @Override
-    public DevopsServiceE selectByNameAndNamespace(String name, String namespace) {
-        DevopsServiceDO devopsServiceDO = new DevopsServiceDO();
-        devopsServiceDO.setName(name);
-        devopsServiceDO.setNamespace(namespace);
-        return ConvertHelper.convert(devopsServiceMapper.selectOne(devopsServiceDO), DevopsServiceE.class);
+    public List<Long> selectDeployedEnv() {
+        return devopsServiceMapper.selectDeployedEnv();
     }
 
     @Override
@@ -173,5 +169,18 @@ public class DevopsServiceRepositoryImpl implements DevopsServiceRepository {
         DevopsServiceDO devopsServiceDO = new DevopsServiceDO();
         devopsServiceDO.setEnvId(envId);
         return ConvertHelper.convertList(devopsServiceMapper.select(devopsServiceDO), DevopsServiceE.class);
+    }
+
+    @Override
+    public void deleteServiceAndInstanceByEnvId(Long envId) {
+        DevopsServiceDO devopsServiceDO = new DevopsServiceDO();
+        devopsServiceDO.setEnvId(envId);
+        // 环境下的serviceIds
+        List<Long> serviceIds = devopsServiceMapper.select(devopsServiceDO).stream().map(DevopsServiceDO::getId)
+                .collect(Collectors.toList());
+        devopsServiceMapper.delete(devopsServiceDO);
+        if (!serviceIds.isEmpty()) {
+            devopsServiceMapper.deleteServiceInstance(serviceIds);
+        }
     }
 }

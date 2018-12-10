@@ -1,6 +1,7 @@
 package io.choerodon.devops.infra.persistence.impl;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -37,17 +38,18 @@ public class DevopsGitlabCommitRepositoryImpl implements DevopsGitlabCommitRepos
     }
 
     @Override
-    public DevopsGitlabCommitE queryBySha(String sha) {
+    public DevopsGitlabCommitE queryByShaAndRef(String sha, String ref) {
         DevopsGitlabCommitDO devopsGitlabCommitDO = new DevopsGitlabCommitDO();
         devopsGitlabCommitDO.setCommitSha(sha);
+        devopsGitlabCommitDO.setRef(ref);
         return ConvertHelper.convert(devopsGitlabCommitMapper.selectOne(devopsGitlabCommitDO),
                 DevopsGitlabCommitE.class);
     }
 
     @Override
-    public List<DevopsGitlabCommitE> listCommits(Long projectId, List<Long> appIds, String startDate, String endDate) {
+    public List<DevopsGitlabCommitE> listCommits(Long projectId, List<Long> appIds, Date startDate, Date endDate) {
         List<DevopsGitlabCommitDO> devopsGitlabCommitDOList = devopsGitlabCommitMapper
-                .listCommits(projectId, appIds, startDate, endDate);
+                .listCommits(projectId, appIds, new java.sql.Date(startDate.getTime()), new java.sql.Date(endDate.getTime()));
         if (devopsGitlabCommitDOList == null || devopsGitlabCommitDOList.isEmpty()) {
             return new ArrayList<>();
         }
@@ -57,11 +59,11 @@ public class DevopsGitlabCommitRepositoryImpl implements DevopsGitlabCommitRepos
     @Override
     public Page<CommitFormRecordDTO> pageCommitRecord(Long projectId, List<Long> appId,
                                                       PageRequest pageRequest, Map<Long, UserE> userMap,
-                                                      String startDate, String endDate) {
+                                                      Date startDate, Date endDate) {
         List<CommitFormRecordDTO> commitFormRecordDTOList = new ArrayList<>();
 
         Page<DevopsGitlabCommitDO> devopsGitlabCommitDOPage = PageHelper.doPageAndSort(pageRequest,
-                () -> devopsGitlabCommitMapper.listCommits(projectId, appId, startDate, endDate));
+                () -> devopsGitlabCommitMapper.listCommits(projectId, appId, new java.sql.Date(startDate.getTime()), new java.sql.Date(endDate.getTime())));
 
         devopsGitlabCommitDOPage.getContent().forEach(e -> {
             Long userId = e.getUserId();

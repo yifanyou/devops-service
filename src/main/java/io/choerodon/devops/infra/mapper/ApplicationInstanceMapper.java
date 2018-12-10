@@ -29,13 +29,17 @@ public interface ApplicationInstanceMapper extends BaseMapper<ApplicationInstanc
                                                             @Param("versionId") Long versionId,
                                                             @Param("appId") Long appId);
 
+    List<ApplicationInstanceDO> listRunningAndFailedInstance(@Param("projectId") Long projectId,
+                                                             @Param("envId") Long envId,
+                                                             @Param("appId") Long appId);
+
     int checkOptions(@Param("envId") Long envId,
                      @Param("appId") Long appId,
                      @Param("appInstanceId") Long appInstanceId);
 
     String queryValueByEnvIdAndAppId(@Param("envId") Long envId, @Param("appId") Long appId);
 
-    List<ApplicationInstancesDO> listApplicationInstances(@Param("projectId") Long projectId, @Param("appId") Long appId, @Param("envGroupId") Long envGroupId);
+    List<ApplicationInstancesDO> listApplicationInstances(@Param("projectId") Long projectId, @Param("appId") Long appId, @Param("envIds") List<Long> envIds);
 
     String queryByInstanceId(@Param("instanceId") Long instanceId);
 

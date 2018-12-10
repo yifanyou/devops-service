@@ -5,16 +5,13 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import feign.FeignException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import io.choerodon.core.convertor.ConvertHelper;
 import io.choerodon.core.exception.CommonException;
-import feign.FeignException;
-import io.choerodon.devops.domain.application.entity.gitlab.BranchE;
-import io.choerodon.devops.domain.application.entity.gitlab.GitlabCommitE;
-import io.choerodon.devops.domain.application.entity.gitlab.GitlabJobE;
-import io.choerodon.devops.domain.application.entity.gitlab.GitlabPipelineE;
+import io.choerodon.devops.domain.application.entity.gitlab.*;
 import io.choerodon.devops.domain.application.repository.GitlabProjectRepository;
 import io.choerodon.devops.infra.dataobject.gitlab.*;
 import io.choerodon.devops.infra.feign.GitlabServiceClient;
@@ -130,19 +127,29 @@ public class GitlabProjectRepositoryImpl implements GitlabProjectRepository {
     }
 
     @Override
-    public void initMockService(GitlabServiceClient gitlabServiceClient) {
-        this.gitlabServiceClient = gitlabServiceClient;
-    }
-
-    @Override
     public List<CommitDO> listCommits(Integer projectId, Integer userId) {
         try {
             List<CommitDO> commitDOS = new LinkedList<>();
-            commitDOS.addAll(gitlabServiceClient.listCommits(projectId,1,100,userId).getBody());
-            commitDOS.addAll(gitlabServiceClient.listCommits(projectId,2,100,userId).getBody());
+            commitDOS.addAll(gitlabServiceClient.listCommits(projectId, 1, 100, userId).getBody());
+            commitDOS.addAll(gitlabServiceClient.listCommits(projectId, 2, 100, userId).getBody());
             return commitDOS;
         } catch (FeignException e) {
             throw new CommonException(e.getMessage(), e);
         }
+    }
+
+    @Override
+    public GitlabMemberE getProjectMember(Integer projectId, Integer userId) {
+        try {
+            return ConvertHelper.convert(gitlabServiceClient.getProjectMember(
+                    projectId, userId).getBody(), GitlabMemberE.class);
+        } catch (FeignException e) {
+            throw new CommonException(e);
+        }
+    }
+
+    @Override
+    public void initMockService(GitlabServiceClient gitlabServiceClient) {
+        this.gitlabServiceClient = gitlabServiceClient;
     }
 }

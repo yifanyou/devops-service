@@ -1,5 +1,7 @@
 package io.choerodon.devops.api.dto;
 
+import java.util.List;
+
 /**
  * Created by younger on 2018/4/9.
  */
@@ -7,10 +9,11 @@ public class DevopsEnviromentDTO {
 
     private Long projectId;
     private String name;
+    private Long clusterId;
     private String code;
     private String description;
     private Long devopsEnvGroupId;
-    private String partition;
+    private List<Long> userIds;
 
     public Long getProjectId() {
         return projectId;
@@ -52,11 +55,19 @@ public class DevopsEnviromentDTO {
         this.devopsEnvGroupId = devopsEnvGroupId;
     }
 
-    public String getPartition() {
-        return partition;
+    public List<Long> getUserIds() {
+        return userIds;
     }
 
-    public void setPartition(String partition) {
-        this.partition = partition;
+    public void setUserIds(List<Long> userIds) {
+        this.userIds = userIds;
+    }
+
+    public Long getClusterId() {
+        return clusterId;
+    }
+
+    public void setClusterId(Long clusterId) {
+        this.clusterId = clusterId;
     }
 }

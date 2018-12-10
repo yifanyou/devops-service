@@ -25,12 +25,16 @@ public class K8sUtil {
     }
 
     private static String getPodStatus(V1ContainerStateTerminated containerStateTerminated) {
-        if (containerStateTerminated.getReason().length() == 0) {
-            return containerStateTerminated.getSignal() != 0
-                    ? INIT + SIGNAL + containerStateTerminated.getSignal()
-                    : INIT + EXIT_CODE + containerStateTerminated.getExitCode();
+        if (containerStateTerminated.getReason() != null) {
+            if (containerStateTerminated.getReason().length() == 0) {
+                return containerStateTerminated.getSignal() != 0
+                        ? INIT + SIGNAL + containerStateTerminated.getSignal()
+                        : INIT + EXIT_CODE + containerStateTerminated.getExitCode();
+            } else {
+                return INIT + containerStateTerminated.getReason();
+            }
         } else {
-            return INIT + containerStateTerminated.getReason();
+            return "";
         }
     }
 
@@ -43,7 +47,7 @@ public class K8sUtil {
     public static String changePodStatus(V1Pod pod) {
         String podStatusPhase = pod.getStatus().getPhase();
         String podStatusReason = pod.getStatus().getReason();
-        String status = getPodStatus(podStatusPhase, podStatusReason);
+        String status = podStatusReason != null ? podStatusReason : podStatusPhase;
         List<V1ContainerStatus> initContainerStatuses = pod.getStatus().getInitContainerStatuses();
         List<V1ContainerStatus> containerStatusList = pod.getStatus().getContainerStatuses();
         if (!ArrayUtil.isEmpty(initContainerStatuses)) {

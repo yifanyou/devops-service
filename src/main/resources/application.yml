@@ -29,7 +29,7 @@ spring:
      max-request-size: 30MB
 services:
   harbor:
-    baseUrl: "http://harbor.example.com"
+    baseUrl: "harbor.example.com"
     username: "123456"
     password: "123456"
   gitlab:
@@ -78,7 +78,7 @@ eureka:
 security:
   basic:
       enabled: false
-  ignored: /ci,/webhook,/v2/api-docs,/agent/**,/ws/**,/projects/**
+  ignored: /ci,/webhook,/v2/api-docs,/agent/**,/ws/**
 mybatis:
   mapperLocations: classpath*:/mapper/*.xml
   configuration:

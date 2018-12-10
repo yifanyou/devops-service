@@ -9,6 +9,7 @@ public class DevopsIngressPathE {
     private String serviceName;
     private Long servicePort;
     private Long objectVersionNumber;
+    private String rewritePath;
 
     public Long getId() {
         return id;
@@ -68,5 +69,13 @@ public class DevopsIngressPathE {
 
     public void setServicePort(Long servicePort) {
         this.servicePort = servicePort;
+    }
+
+    public String getRewritePath() {
+        return rewritePath;
+    }
+
+    public void setRewritePath(String rewritePath) {
+        this.rewritePath = rewritePath;
     }
 }

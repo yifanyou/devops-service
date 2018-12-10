@@ -3,9 +3,11 @@ package io.choerodon.devops.app.service;
 import java.util.List;
 
 import io.choerodon.asgard.saga.feign.SagaClient;
+import io.choerodon.core.domain.Page;
 import io.choerodon.devops.api.dto.*;
 import io.choerodon.devops.domain.application.entity.DevopsEnvironmentE;
 import io.choerodon.devops.domain.application.event.GitlabProjectPayload;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 /**
  * Created by younger on 2018/4/9.
@@ -18,7 +20,7 @@ public interface DevopsEnvironmentService {
      * @param devopsEnviromentDTO 环境信息
      * @return String
      */
-    String create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO);
+    void create(Long projectId, DevopsEnviromentDTO devopsEnviromentDTO);
 
     /**
      * 项目下环境流水线查询环境
@@ -29,7 +31,6 @@ public interface DevopsEnvironmentService {
      */
     List<DevopsEnvGroupEnvsDTO> listDevopsEnvGroupEnvs(Long projectId, Boolean active);
 
-
     /**
      * 项目下查询环境
      *
@@ -38,6 +39,7 @@ public interface DevopsEnvironmentService {
      * @return List
      */
     List<DevopsEnviromentRepDTO> listByProjectIdAndActive(Long projectId, Boolean active);
+
     /**
      * 项目下查询环境
      *
@@ -81,23 +83,13 @@ public interface DevopsEnvironmentService {
      */
     DevopsEnvGroupEnvsDTO sort(Long[] environmentIds);
 
-
-    /**
-     * 项目下查询单个环境的可执行shell
-     *
-     * @param environmentId 环境id
-     * @param update        是否更新
-     * @return String
-     */
-    String queryShell(Long environmentId, Boolean update);
-
     /**
      * 创建环境校验名称是否存在
      *
      * @param projectId 项目id
      * @param name      应用name
      */
-    void checkName(Long projectId, String name);
+    void checkName(Long projectId, Long clusterId, String name);
 
     /**
      * 创建环境校验编码是否存在
@@ -105,7 +97,7 @@ public interface DevopsEnvironmentService {
      * @param projectId 项目ID
      * @param code      应用code
      */
-    void checkCode(Long projectId, String code);
+    void checkCode(Long projectId, Long clusterId, String code);
 
     /**
      * 项目下查询有正在运行实例的环境
@@ -122,10 +114,53 @@ public interface DevopsEnvironmentService {
      */
     void handleCreateEnvSaga(GitlabProjectPayload gitlabProjectPayload);
 
-
     EnvSyncStatusDTO queryEnvSyncStatus(Long projectId, Long envId);
 
     String handDevopsEnvGitRepository(DevopsEnvironmentE devopsEnvironmentE);
 
+    /**
+     * 分页查询项目下用户权限
+     *
+     * @param projectId   项目id
+     * @param pageRequest 分页参数
+     * @param envId       环境id
+     * @return page
+     */
+    Page<DevopsEnvUserPermissionDTO> listUserPermissionByEnvId(Long projectId, PageRequest pageRequest,
+                                                               String params, Long envId);
+
+    /**
+     * 获取环境下所有用户权限
+     *
+     * @param envId 环境id
+     * @return list
+     */
+    List<DevopsEnvUserPermissionDTO> listAllUserPermission(Long envId);
+
+    /**
+     * 环境下为用户分配权限
+     *
+     * @param projectId 项目id
+     * @param envId     环境id
+     * @param userIds   有权限的用户ids
+     */
+    Boolean updateEnvUserPermission(Long projectId, Long envId, List<Long> userIds);
+
+    /**
+     * 删除已停用的环境
+     *
+     * @param envId 环境id
+     */
+    void deleteDeactivatedEnvironment(Long envId);
+
+    /**
+     * 项目下查询集群信息
+     *
+     * @param projectId 项目id
+     * @return List
+     */
+    List<DevopsClusterRepDTO> listDevopsCluster(Long projectId);
+
     void initMockService(SagaClient sagaClient);
+
 }

@@ -40,16 +40,19 @@ public class DevopsEnvResourceServiceImpl implements DevopsEnvResourceService {
     private DevopsIngressRepository devopsIngressRepository;
     @Autowired
     private DevopsCommandEventRepository devopsCommandEventRepository;
+    @Autowired
+    private ApplicationInstanceRepository applicationInstanceRepository;
 
     @Override
     public DevopsEnvResourceDTO listResources(Long instanceId) {
+        ApplicationInstanceE applicationInstanceE = applicationInstanceRepository.selectById(instanceId);
         List<DevopsEnvResourceE> devopsEnvResourceES =
                 devopsEnvResourceRepository.listByInstanceId(instanceId);
         DevopsEnvResourceDTO devopsEnvResourceDTO = new DevopsEnvResourceDTO();
         if (devopsEnvResourceES == null) {
             return devopsEnvResourceDTO;
         }
-        devopsEnvResourceES.parallelStream().forEach(devopsInstanceResourceE -> {
+        devopsEnvResourceES.forEach(devopsInstanceResourceE -> {
             DevopsEnvResourceDetailE devopsEnvResourceDetailE =
                     devopsEnvResourceDetailRepository.query(
                             devopsInstanceResourceE.getDevopsEnvResourceDetailE().getId());
@@ -71,13 +74,13 @@ public class DevopsEnvResourceServiceImpl implements DevopsEnvResourceService {
                 case SERVICE:
                     V1Service v1Service = json.deserialize(devopsEnvResourceDetailE.getMessage(),
                             V1Service.class);
-                    DevopsServiceE devopsServiceE = devopsServiceRepository.selectByNameAndNamespace(
-                            devopsInstanceResourceE.getName(), v1Service.getMetadata().getNamespace());
+                    DevopsServiceE devopsServiceE = devopsServiceRepository.selectByNameAndEnvId(
+                            devopsInstanceResourceE.getName(), applicationInstanceE.getDevopsEnvironmentE().getId());
                     if (devopsServiceE != null) {
                         List<String> domainNames =
                                 devopsIngressRepository.queryIngressNameByServiceId(
                                         devopsServiceE.getId());
-                        domainNames.parallelStream().forEach(domainName -> {
+                        domainNames.stream().forEach(domainName -> {
                             DevopsEnvResourceE devopsEnvResourceE1 =
                                     devopsEnvResourceRepository.queryByInstanceIdAndKindAndName(
                                             null,
@@ -95,6 +98,14 @@ public class DevopsEnvResourceServiceImpl implements DevopsEnvResourceService {
                         });
                     }
                     addServiceToResource(devopsEnvResourceDTO, v1Service);
+                    break;
+                case INGRESS:
+                    if (devopsInstanceResourceE.getApplicationInstanceE() != null) {
+                        V1beta1Ingress v1beta1Ingress = json.deserialize(
+                                devopsEnvResourceDetailE.getMessage(),
+                                V1beta1Ingress.class);
+                        addIngressToResource(devopsEnvResourceDTO, v1beta1Ingress);
+                    }
                     break;
                 case REPLICASET:
                     V1beta2ReplicaSet v1beta2ReplicaSet = json.deserialize(
@@ -194,11 +205,11 @@ public class DevopsEnvResourceServiceImpl implements DevopsEnvResourceService {
      * @param devopsEnvResourceDTO 实例资源参数
      * @param v1Pod                pod对象
      */
-    public void addPodToResource(DevopsEnvResourceDTO devopsEnvResourceDTO, V1Pod v1Pod) {
+    private void addPodToResource(DevopsEnvResourceDTO devopsEnvResourceDTO, V1Pod v1Pod) {
         PodDTO podDTO = new PodDTO();
         podDTO.setName(v1Pod.getMetadata().getName());
         podDTO.setDesire(TypeUtil.objToLong(v1Pod.getSpec().getContainers().size()));
-        Long ready = 0L;
+        long ready = 0L;
         Long restart = 0L;
         if (v1Pod.getStatus().getContainerStatuses() != null) {
             for (V1ContainerStatus v1ContainerStatus : v1Pod.getStatus().getContainerStatuses()) {

@@ -14,6 +14,7 @@ import io.choerodon.asgard.saga.annotation.SagaTask;
 import io.choerodon.devops.api.dto.GitlabGroupMemberDTO;
 import io.choerodon.devops.api.dto.GitlabUserDTO;
 import io.choerodon.devops.api.dto.GitlabUserRequestDTO;
+import io.choerodon.devops.api.dto.RegisterOrganizationDTO;
 import io.choerodon.devops.app.service.*;
 import io.choerodon.devops.domain.application.event.GitlabGroupPayload;
 import io.choerodon.devops.domain.application.event.HarborPayload;
@@ -200,7 +201,7 @@ public class SagaHandler {
         List<GitlabUserDTO> gitlabUserDTO = gson.fromJson(payload, new TypeToken<List<GitlabUserDTO>>() {
         }.getType());
         loggerInfo(gitlabUserDTO);
-        gitlabUserDTO.parallelStream().forEach(t -> {
+        gitlabUserDTO.stream().forEach(t -> {
             GitlabUserRequestDTO gitlabUserReqDTO = new GitlabUserRequestDTO();
             gitlabUserReqDTO.setProvider("oauth2_generic");
             gitlabUserReqDTO.setExternUid(t.getId());
@@ -267,5 +268,20 @@ public class SagaHandler {
         gitlabUserService.disEnabledGitlabUser(TypeUtil.objToInteger(gitlabUserDTO.getId()));
         return payload;
     }
+
+    /**
+     * 注册组织事件
+     */
+    @SagaTask(code = "devopsOrgRegister", description = "注册组织",
+            sagaCode = "org-register", maxRetryCount = 0,
+            seq = 1)
+    public String registerOrganization(String payload) {
+        RegisterOrganizationDTO registerOrganizationDTO = gson.fromJson(payload, RegisterOrganizationDTO.class);
+        loggerInfo(registerOrganizationDTO);
+
+        organizationService.registerOrganization(registerOrganizationDTO);
+        return payload;
+    }
+
 
 }

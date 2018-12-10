@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.alibaba.fastjson.JSONObject;
@@ -71,7 +72,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
     private static final String REF_HEADS = "refs/heads/";
     private static final String GIT_SUFFIX = "/.git";
     private static final Logger LOGGER = LoggerFactory.getLogger(DevopsGitServiceImpl.class);
-
+    Pattern pattern = Pattern.compile("^[-\\+]?[\\d]*$");
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${services.gitlab.url}")
@@ -219,10 +220,10 @@ public class DevopsGitServiceImpl implements DevopsGitService {
                 devopsGitRepository.listBranches(applicationId, pageRequest, params);
         Page<BranchDTO> page = new Page<>();
         BeanUtils.copyProperties(branches, page);
-        page.setContent(branches.parallelStream().map(t -> {
+        page.setContent(branches.stream().map(t -> {
             Issue issue = null;
             if (t.getIssueId() != null) {
-                issue = agileRepository.queryIssue(projectId, t.getIssueId());
+                issue = agileRepository.queryIssue(projectId, t.getIssueId(), organization.getId());
             }
             UserE userE = iamRepository.queryUserByUserId(
                     devopsGitRepository.getUserIdByGitlabUserId(t.getUserId()));
@@ -305,7 +306,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
 
     @Override
     public Boolean checkTag(Long projectId, Long applicationId, String tagName) {
-        return devopsGitRepository.getTagList(applicationId, getGitlabUserId()).parallelStream()
+        return devopsGitRepository.getTagList(applicationId, getGitlabUserId()).stream()
                 .noneMatch(t -> tagName.equals(t.getName()));
     }
 
@@ -340,13 +341,13 @@ public class DevopsGitServiceImpl implements DevopsGitService {
 
         });
         DevopsEnvCommitE devopsEnvCommitE = devopsEnvCommitRepository.queryByEnvIdAndCommit(devopsEnvironmentE.getId(), pushWebHookDTO.getCheckoutSha());
-        devopsEnvironmentE.setGitCommit(devopsEnvCommitE.getId());
+        devopsEnvironmentE.setSagaSyncCommit(devopsEnvCommitE.getId());
         devopsEnvironmentRepository.updateEnvCommit(devopsEnvironmentE);
         try {
             input = objectMapper.writeValueAsString(pushWebHookDTO);
             sagaClient.startSaga("devops-sync-gitops", new StartInstanceDTO(input, "env", devopsEnvironmentE.getId().toString()));
         } catch (JsonProcessingException e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException(e.getMessage(), e);
         }
     }
 
@@ -356,6 +357,9 @@ public class DevopsGitServiceImpl implements DevopsGitService {
         final Integer gitLabProjectId = pushWebHookDTO.getProjectId();
         final Integer gitLabUserId = pushWebHookDTO.getUserId();
         Long userId = userAttrRepository.queryUserIdByGitlabUserId(TypeUtil.objToLong(gitLabUserId));
+        if (userId == null) {
+            return;
+        }
 
         List<String> operationFiles = new ArrayList<>();
         List<String> deletedFiles = new ArrayList<>();
@@ -363,7 +367,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
         Set<DevopsEnvFileResourceE> beforeSyncDelete = new HashSet<>();
         //根据token查出环境
         DevopsEnvironmentE devopsEnvironmentE = devopsEnvironmentRepository.queryByToken(pushWebHookDTO.getToken());
-        DevopsEnvCommitE devopsEnvCommitE = devopsEnvCommitRepository.query(devopsEnvironmentE.getGitCommit());
+        DevopsEnvCommitE devopsEnvCommitE = devopsEnvCommitRepository.query(devopsEnvironmentE.getSagaSyncCommit());
         Boolean tagNotExist = false;
         Map<String, String> objectPath = new HashMap<>();
         //从iam服务中查出项目和组织code
@@ -374,8 +378,10 @@ public class DevopsGitServiceImpl implements DevopsGitService {
         final String path = String.format("gitops/%s/%s/%s",
                 organization.getCode(), projectE.getCode(), devopsEnvironmentE.getCode());
         //生成环境git仓库ssh地址
-        final String url = String.format("git@%s:%s-%s-gitops/%s.git",
-                gitlabSshUrl, organization.getCode(), projectE.getCode(), devopsEnvironmentE.getCode());
+        final String url = GitUtil.getGitlabSshUrl(pattern, gitlabSshUrl, organization.getCode(), projectE.getCode(), devopsEnvironmentE.getCode());
+
+        LOGGER.info("The gitOps Repository ssh url:" + url);
+
         final Long envId = devopsEnvironmentE.getId();
 
         final Long projectId = devopsEnvironmentE.getProjectE().getId();
@@ -389,7 +395,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
 
             if (tagNotExist) {
                 operationFiles.addAll(FileUtil.getFilesPath(path));
-                operationFiles.parallelStream().forEach(file -> {
+                operationFiles.stream().forEach(file -> {
                     List<DevopsEnvFileResourceE> devopsEnvFileResourceES = devopsEnvFileResourceRepository
                             .queryByEnvIdAndPath(devopsEnvironmentE.getId(), file);
                     if (!devopsEnvFileResourceES.isEmpty()) {
@@ -532,7 +538,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
             }
         });
 
-        deletedFiles.parallelStream().forEach(file -> {
+        deletedFiles.stream().forEach(file -> {
             List<DevopsEnvFileResourceE> devopsEnvFileResourceES = devopsEnvFileResourceRepository
                     .queryByEnvIdAndPath(devopsEnvironmentE.getId(), file);
             if (!devopsEnvFileResourceES.isEmpty()) {
@@ -690,7 +696,7 @@ public class DevopsGitServiceImpl implements DevopsGitService {
     }
 
     private boolean getDevopsSyncTag(PushWebHookDTO pushWebHookDTO) {
-        return devopsGitRepository.getGitLabTags(pushWebHookDTO.getProjectId(), pushWebHookDTO.getUserId()).parallelStream().noneMatch(tagDO -> tagDO.getName().equals(GitUtil.DEV_OPS_SYNC_TAG));
+        return devopsGitRepository.getGitLabTags(pushWebHookDTO.getProjectId(), pushWebHookDTO.getUserId()).stream().noneMatch(tagDO -> tagDO.getName().equals(GitUtil.DEV_OPS_SYNC_TAG));
 
     }
 

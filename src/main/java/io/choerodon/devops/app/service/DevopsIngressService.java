@@ -52,16 +52,6 @@ public interface DevopsIngressService {
 
 
     /**
-     * 项目下查询域
-     *
-     * @param projectId   项目Id
-     * @param pageRequest 分页参数
-     * @param params      模糊查询参数
-     * @return Page
-     */
-    Page<DevopsIngressDTO> getIngress(Long projectId, PageRequest pageRequest, String params);
-
-    /**
      * 项目下查询域名
      *
      * @param projectId 项目Id
@@ -102,7 +92,7 @@ public interface DevopsIngressService {
      * @param id     ingress ID
      * @return boolean
      */
-    Boolean checkDomainAndPath(Long id, String domain, String path);
+    Boolean checkDomainAndPath(Long envId, String domain, String path, Long id);
 
     /**
      * 项目下创建域名
