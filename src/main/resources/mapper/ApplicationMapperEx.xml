@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="io.choerodon.devops.infra.mapper.ApplicationExMapper">
+
+    <select id="list" resultType="io.choerodon.devops.infra.dataobject.ApplicationDO">
+        SELECT
+        da.id,
+        da.project_id,
+        da.name,
+        da.code,
+        da.is_active,
+        da.is_synchro,
+        da.gitlab_project_id,
+        da.app_template_id,
+        da.uuid
+        FROM devops_application da
+        where da.project_id in
+        (<foreach item="projectId" collection="projectIds" separator=",">
+        #{projectId}
+        </foreach>)
+        <if test="isActive != null">
+            <if test="isActive">
+                AND da.is_active = TRUE
+            </if>
+            <if test="!isActive">
+                AND da.is_active = FALSE
+            </if>
+        </if>
+        <if test="hasVersion != null">
+            <if test="hasVersion">
+                AND EXISTS ( SELECT 1 FROM devops_app_version dav WHERE dav.app_id = da.id )
+            </if>
+            <if test="!hasVersion">
+                AND NOT EXISTS ( SELECT 1 FROM devops_app_version dav WHERE dav.app_id = da.id )
+            </if>
+        </if>
+        <include refid="sqlparam"/>
+        <if test="index !=''">
+            ORDER BY da.is_active desc,
+            (
+            da.is_synchro = 1
+            AND da.gitlab_project_id IS NOT NULL
+            )
+            OR da.is_synchro = 0 DESC,
+            da.id desc
+        </if>
+    </select>
+
+    <sql id="sqlparam">
+        <if test='searchParam != null'>
+            <if test='searchParam.code != null and searchParam.code.size > 0'>
+                AND
+                <foreach collection="searchParam.code" item="code" open="(" separator=" OR " close=")">
+                    da.code LIKE CONCAT(CONCAT('%', #{code, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.name != null and searchParam.name.size > 0'>
+                AND
+                <foreach collection="searchParam.name" item="name" open="(" separator=" OR " close=")">
+                    da.name LIKE CONCAT(CONCAT('%', #{name, jdbcType=VARCHAR}),'%')
+                </foreach>
+            </if>
+            <if test='searchParam.active != null and searchParam.active.size > 0'>
+                AND
+                <foreach collection="searchParam.active" item="active" open="(" separator=" OR " close=")">
+                    <if test='active!=-1'>
+                        da.is_active = #{active,jdbcType=TINYINT}
+                        <if test='active==1'>
+                            and da.is_synchro = 1
+                        </if>
+                    </if>
+                    <if test='active==-1'>
+                        da.is_synchro = 0
+                    </if>
+                </foreach>
+            </if>
+        </if>
+        <if test='param != null and param != ""'>
+            AND (da.code LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            OR da.name LIKE CONCAT(CONCAT('%', #{param, jdbcType=VARCHAR}),'%')
+            )
+        </if>
+    </sql>
+</mapper>
